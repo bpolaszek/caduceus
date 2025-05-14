@@ -1,0 +1,39 @@
+{
+  "name": "bentools-caduceus",
+  "type": "module",
+  "description": "A lightweight TypeScript library for Mercure real-time updates integration with API Platform / Hydra resources.",
+  "version": "1.0.0",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/caduceus.umd.js",
+  "module": "./dist/caduceus.es.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/caduceus.es.js",
+      "require": "./dist/caduceus.umd.js"
+    }
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest",
+    "lint": "prettier --check \"(src|tests)/**\" --ignore-unknown",
+    "format": "prettier -w \"(src|tests)/**\" --ignore-unknown"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "buffer": "^6.0.3",
+    "path": "^0.12.7",
+    "prettier": "^3.0.0",
+    "rollup-plugin-node-externals": "^8.0.0",
+    "typescript": "^5.0.2",
+    "vite": "^6.0.3",
+    "vite-plugin-dts": "^4.4.0",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {}
+}
