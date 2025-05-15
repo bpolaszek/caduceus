@@ -1,10 +1,11 @@
 import { spaceship } from "./spaceship.ts"
 
 type Topic = string
-type Listener = (data: any, event: MessageEvent) => void
+type Listener = (data: any, event: MercureMessageEvent) => void
 
+export type MercureMessageEvent = Pick<MessageEvent, 'data' | 'lastEventId'>
 export interface EventSourceInterface {
-  onmessage: ((event: MessageEvent) => void) | null;
+  onmessage: ((event: MercureMessageEvent) => void) | null;
   close(): void;
 }
 
@@ -14,7 +15,7 @@ export interface EventSourceFactory {
 
 export class DefaultEventSourceFactory implements EventSourceFactory {
   create(url: string | URL): EventSourceInterface {
-    return new EventSource(url.toString());
+    return new EventSource(url.toString()) as EventSourceInterface;
   }
 }
 
@@ -54,7 +55,7 @@ export class Mercure {
     const {handler: handle} = this.options
 
 
-    this.eventSource.onmessage = (event: MessageEvent) => {
+    this.eventSource.onmessage = (event: MercureMessageEvent) => {
       this.lastEventId = event.lastEventId
       const data = JSON.parse(event.data)
       handle(data, event)
@@ -63,8 +64,8 @@ export class Mercure {
 
   unsubscribe(topic: Topic | Topic[]): void {
     const topics = Array.isArray(topic) ? topic : [topic]
-    this.subscribedTopics = this.subscribedTopics.filter((t) => !topics.includes(t))
-    this.connect([], false)
+    const newTopicList = this.subscribedTopics.filter((t) => !topics.includes(t))
+    this.connect(newTopicList, true)
   }
 
   private connect(topics: Topic[], clearSubscribedTopics: boolean): EventSourceInterface {
@@ -72,12 +73,16 @@ export class Mercure {
     const resolvedTopics = resolveSubscribedTopics(topics)
     const mergedTopics = resolveSubscribedTopics([...resolvedSubscribedTopics, ...resolvedTopics])
 
-    if (this.eventSource && 0 === spaceship(resolvedSubscribedTopics, mergedTopics)) {
+    if (this.eventSource && mergedTopics.length > 0 && 0 === spaceship(resolvedSubscribedTopics, mergedTopics)) {
       return this.eventSource
     }
 
     if (this.eventSource) {
       this.eventSource.close()
+
+      if (mergedTopics.length === 0) {
+        return this.eventSource
+      }
     }
 
     const params: Record<string, string> = { topics: mergedTopics.join(',') }
