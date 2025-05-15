@@ -2,8 +2,25 @@ import { spaceship } from "./spaceship.ts"
 
 type Topic = string
 type Listener = (data: any, event: MessageEvent) => void
+
+export interface EventSourceInterface {
+  onmessage: ((event: MessageEvent) => void) | null;
+  close(): void;
+}
+
+export interface EventSourceFactory {
+  create(url: string | URL): EventSourceInterface;
+}
+
+export class DefaultEventSourceFactory implements EventSourceFactory {
+  create(url: string | URL): EventSourceInterface {
+    return new EventSource(url.toString());
+  }
+}
+
 export type MercureOptions = {
-  handler: Listener
+  handler: Listener;
+  eventSourceFactory?: EventSourceFactory;
 }
 
 const resolveSubscribedTopics = (topics: Topic[]): Topic[] => {
@@ -14,12 +31,13 @@ const resolveSubscribedTopics = (topics: Topic[]): Topic[] => {
 }
 
 const DEAULT_OPTIONS: MercureOptions = {
-  handler : () => {}
+  handler: () => {},
+  eventSourceFactory: new DefaultEventSourceFactory()
 }
 
 export class Mercure {
   private subscribedTopics: Topic[] = []
-  private eventSource: EventSource | null = null
+  private eventSource: EventSourceInterface | null = null
   private lastEventId: string | null = null
   private readonly options: MercureOptions
 
@@ -49,7 +67,7 @@ export class Mercure {
     this.connect([], false)
   }
 
-  private connect(topics: Topic[], clearSubscribedTopics: boolean): EventSource {
+  private connect(topics: Topic[], clearSubscribedTopics: boolean): EventSourceInterface {
     const resolvedSubscribedTopics = clearSubscribedTopics ? [] : resolveSubscribedTopics(this.subscribedTopics)
     const resolvedTopics = resolveSubscribedTopics(topics)
     const mergedTopics = resolveSubscribedTopics([...resolvedSubscribedTopics, ...resolvedTopics])
@@ -67,6 +85,10 @@ export class Mercure {
       params.lastEventID = this.lastEventId
     }
 
-    return new EventSource(this.hub + '?' + new URLSearchParams(params))
+    const url = this.hub + '?' + new URLSearchParams(params);
+    this.eventSource = this.options.eventSourceFactory!.create(url);
+    this.subscribedTopics = mergedTopics;
+
+    return this.eventSource;
   }
 }
