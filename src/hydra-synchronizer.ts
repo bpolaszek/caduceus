@@ -1,4 +1,4 @@
-import { Mercure, MercureOptions } from "./mercure.ts"
+import {Mercure, MercureOptions} from './mercure.ts'
 
 type ResourceListener = (resource: ApiResource) => Listener
 type Listener = (data: ApiResource, event: MessageEvent) => void
@@ -16,15 +16,11 @@ const DEFAULT_OPTIONS: Partial<HydraSynchronizerOptions> = {
 }
 
 export class HydraSynchronizer {
-
   public readonly mercure: Mercure
-  private readonly listeners: Map<Iri, Listener> = new Map
+  private readonly listeners: Map<Iri, Listener> = new Map()
   private readonly options: HydraSynchronizerOptions
 
-  constructor(
-    hub: string | URL,
-    options: Partial<HydraSynchronizerOptions> = {},
-  ) {
+  constructor(hub: string | URL, options: Partial<HydraSynchronizerOptions> = {}) {
     this.options = {...DEFAULT_OPTIONS, ...options} as HydraSynchronizerOptions
     this.mercure = new Mercure(hub, {
       ...this.options,

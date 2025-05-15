@@ -1,27 +1,27 @@
-import { spaceship } from "./spaceship.ts"
+import {spaceship} from './spaceship.ts'
 
 type Topic = string
 type Listener = (data: any, event: MercureMessageEvent) => void
 
 export type MercureMessageEvent = Pick<MessageEvent, 'data' | 'lastEventId'>
 export interface EventSourceInterface {
-  onmessage: ((event: MercureMessageEvent) => void) | null;
-  close(): void;
+  onmessage: ((event: MercureMessageEvent) => void) | null
+  close(): void
 }
 
 export interface EventSourceFactory {
-  create(url: string | URL): EventSourceInterface;
+  create(url: string | URL): EventSourceInterface
 }
 
 export class DefaultEventSourceFactory implements EventSourceFactory {
   create(url: string | URL): EventSourceInterface {
-    return new EventSource(url.toString()) as EventSourceInterface;
+    return new EventSource(url.toString()) as EventSourceInterface
   }
 }
 
 export type MercureOptions = {
-  handler: Listener;
-  eventSourceFactory?: EventSourceFactory;
+  handler: Listener
+  eventSourceFactory?: EventSourceFactory
 }
 
 const resolveSubscribedTopics = (topics: Topic[]): Topic[] => {
@@ -33,7 +33,7 @@ const resolveSubscribedTopics = (topics: Topic[]): Topic[] => {
 
 const DEAULT_OPTIONS: MercureOptions = {
   handler: () => {},
-  eventSourceFactory: new DefaultEventSourceFactory()
+  eventSourceFactory: new DefaultEventSourceFactory(),
 }
 
 export class Mercure {
@@ -44,16 +44,15 @@ export class Mercure {
 
   constructor(
     private readonly hub: string | URL,
-    options: Partial<MercureOptions> = {},
+    options: Partial<MercureOptions> = {}
   ) {
-    this.options = { ...DEAULT_OPTIONS, ...options }
+    this.options = {...DEAULT_OPTIONS, ...options}
   }
 
   subscribe(topic: Topic | Topic[], append: boolean = true): void {
     const topics = Array.isArray(topic) ? topic : [topic]
     this.eventSource = this.connect(topics, !append)
     const {handler: handle} = this.options
-
 
     this.eventSource.onmessage = (event: MercureMessageEvent) => {
       this.lastEventId = event.lastEventId
@@ -85,15 +84,15 @@ export class Mercure {
       }
     }
 
-    const params: Record<string, string> = { topics: mergedTopics.join(',') }
+    const params: Record<string, string> = {topics: mergedTopics.join(',')}
     if (this.lastEventId !== null) {
       params.lastEventID = this.lastEventId
     }
 
-    const url = this.hub + '?' + new URLSearchParams(params);
-    this.eventSource = this.options.eventSourceFactory!.create(url);
-    this.subscribedTopics = mergedTopics;
+    const url = this.hub + '?' + new URLSearchParams(params)
+    this.eventSource = this.options.eventSourceFactory!.create(url)
+    this.subscribedTopics = mergedTopics
 
-    return this.eventSource;
+    return this.eventSource
   }
 }

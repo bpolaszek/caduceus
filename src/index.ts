@@ -1,1 +1,1 @@
-export * from "./mercure.ts"
+export * from './mercure.ts'
