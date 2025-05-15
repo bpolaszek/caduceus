@@ -1,7 +1,7 @@
-import {Mercure, MercureOptions} from './mercure.ts'
+import { Mercure, MercureMessageEvent, MercureOptions } from './mercure.ts'
 
 type ResourceListener = (resource: ApiResource) => Listener
-type Listener = (data: ApiResource, event: MessageEvent) => void
+type Listener = (data: ApiResource, event: MercureMessageEvent) => void
 type Iri = string
 type ApiResource = Record<string, any> & {
   '@id': Iri
@@ -24,7 +24,7 @@ export class HydraSynchronizer {
     this.options = {...DEFAULT_OPTIONS, ...options} as HydraSynchronizerOptions
     this.mercure = new Mercure(hub, {
       ...this.options,
-      handler: (data: ApiResource, event: MessageEvent) => {
+      handler: (data: ApiResource, event: MercureMessageEvent) => {
         const callback = this.listeners.get(data['@id'])
         if (callback) {
           callback(data, event)
