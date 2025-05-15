@@ -1,4 +1,4 @@
-import { Mercure, MercureMessageEvent, MercureOptions } from './mercure.ts'
+import {Mercure, MercureMessageEvent, MercureOptions} from './mercure.ts'
 
 type ResourceListener = (resource: ApiResource) => Listener
 type Listener = (data: ApiResource, event: MercureMessageEvent) => void
