@@ -1,42 +1,6 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
-import {HydraSynchronizer} from '../src/hydra-synchronizer'
-import {EventSourceFactory, EventSourceInterface, MercureMessageEvent} from '../src'
-
-// Mock EventSource implementation for testing
-class MockEventSource implements EventSourceInterface {
-  onmessage: ((event: MercureMessageEvent) => void) | null = null
-  url: string
-  isClosed: boolean = false
-
-  constructor(url: string) {
-    this.url = url
-  }
-
-  close(): void {
-    this.isClosed = true
-  }
-
-  // Helper method to simulate receiving a message
-  simulateMessage(data: any, lastEventId: string = '1'): void {
-    if (this.onmessage) {
-      const messageEvent = {
-        data: JSON.stringify(data),
-        lastEventId,
-      } as MercureMessageEvent
-
-      this.onmessage(messageEvent)
-    }
-  }
-}
-
-class MockEventSourceFactory implements EventSourceFactory {
-  lastCreatedSource: MockEventSource | null = null
-
-  create(url: string | URL): EventSourceInterface {
-    this.lastCreatedSource = new MockEventSource(url.toString())
-    return this.lastCreatedSource
-  }
-}
+import {HydraSynchronizer} from '../src'
+import {MockEventSourceFactory} from './utils/mock-event-source'
 
 describe('HydraSynchronizer', () => {
   let mockFactory: MockEventSourceFactory
