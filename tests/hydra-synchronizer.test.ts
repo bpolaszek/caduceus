@@ -58,7 +58,7 @@ describe('HydraSynchronizer', () => {
       const resource = {'@id': '/api/books/1'}
       synchronizer.sync(resource)
 
-      expect(mockFactory.lastCreatedSource?.url).toContain('topics=%2Fapi%2Fbooks%2F1')
+      expect(mockFactory.lastCreatedSource?.url).toContain('topic=%2Fapi%2Fbooks%2F1')
     })
 
     it('should subscribe using a custom topic when provided', () => {
@@ -69,7 +69,7 @@ describe('HydraSynchronizer', () => {
       const resource = {'@id': '/api/books/1'}
       synchronizer.sync(resource, '/api/books/{id}')
 
-      expect(mockFactory.lastCreatedSource?.url).toContain('topics=%2Fapi%2Fbooks%2F%7Bid%7D')
+      expect(mockFactory.lastCreatedSource?.url).toContain('topic=%2Fapi%2Fbooks%2F%7Bid%7D')
     })
 
     it('should not subscribe again to the same resource', () => {
@@ -101,7 +101,7 @@ describe('HydraSynchronizer', () => {
       synchronizer.sync(resource2)
 
       // Should be subscribed to both topics
-      expect(mockFactory.lastCreatedSource?.url).toContain('topics=%2Fapi%2Fbooks%2F1%2C%2Fapi%2Fbooks%2F2')
+      expect(mockFactory.lastCreatedSource?.url).toContain('topic=%2Fapi%2Fbooks%2F1%2C%2Fapi%2Fbooks%2F2')
     })
 
     it('should use URI template for multiple resources efficiently', () => {
@@ -116,7 +116,7 @@ describe('HydraSynchronizer', () => {
       synchronizer.sync(resource2, '/api/books/{id}')
 
       // Should be subscribed to the template only once
-      expect(mockFactory.lastCreatedSource?.url).toContain('topics=%2Fapi%2Fbooks%2F%7Bid%7D')
+      expect(mockFactory.lastCreatedSource?.url).toContain('topic=%2Fapi%2Fbooks%2F%7Bid%7D')
       expect(mockFactory.lastCreatedSource?.url.match(/%2Fapi%2Fbooks%2F%7Bid%7D/g)?.length).toBe(1)
     })
   })

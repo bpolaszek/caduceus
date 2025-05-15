@@ -36,7 +36,7 @@ describe('Mercure', () => {
 
       expect(mockFactory.lastCreatedSource).not.toBeNull()
       expect(mockFactory.lastCreatedSource?.url).toContain(hub)
-      expect(mockFactory.lastCreatedSource?.url).toContain('topics=topic')
+      expect(mockFactory.lastCreatedSource?.url).toContain('topic=topic')
     })
   })
 
@@ -48,7 +48,7 @@ describe('Mercure', () => {
 
       mercure.subscribe('topic1')
 
-      expect(mockFactory.lastCreatedSource?.url).toContain('topics=topic1')
+      expect(mockFactory.lastCreatedSource?.url).toContain('topic=topic1')
     })
 
     it('should subscribe to multiple topics', () => {
@@ -58,7 +58,7 @@ describe('Mercure', () => {
 
       mercure.subscribe(['topic1', 'topic2'])
 
-      expect(mockFactory.lastCreatedSource?.url).toContain('topics=topic1%2Ctopic2')
+      expect(mockFactory.lastCreatedSource?.url).toContain('topic=topic1%2Ctopic2')
     })
 
     it('should append topics when append is true', () => {
@@ -69,7 +69,7 @@ describe('Mercure', () => {
       mercure.subscribe('topic1')
       mercure.subscribe('topic2', true)
 
-      expect(mockFactory.lastCreatedSource?.url).toContain('topics=topic1%2Ctopic2')
+      expect(mockFactory.lastCreatedSource?.url).toContain('topic=topic1%2Ctopic2')
     })
 
     it('should replace topics when append is false', () => {
@@ -80,7 +80,7 @@ describe('Mercure', () => {
       mercure.subscribe('topic1')
       mercure.subscribe('topic2', false)
 
-      expect(mockFactory.lastCreatedSource?.url).toContain('topics=topic2')
+      expect(mockFactory.lastCreatedSource?.url).toContain('topic=topic2')
       expect(mockFactory.lastCreatedSource?.url).not.toContain('topic1')
     })
 
@@ -91,7 +91,7 @@ describe('Mercure', () => {
 
       mercure.subscribe('*')
 
-      expect(mockFactory.lastCreatedSource?.url).toContain('topics=*')
+      expect(mockFactory.lastCreatedSource?.url).toContain('topic=*')
     })
 
     it('should optimize to wildcard when subscribing to * along with other topics', () => {
@@ -101,7 +101,7 @@ describe('Mercure', () => {
 
       mercure.subscribe(['topic1', '*', 'topic2'])
 
-      expect(mockFactory.lastCreatedSource?.url).toContain('topics=*')
+      expect(mockFactory.lastCreatedSource?.url).toContain('topic=*')
       expect(mockFactory.lastCreatedSource?.url).not.toContain('topic1')
       expect(mockFactory.lastCreatedSource?.url).not.toContain('topic2')
     })
@@ -116,7 +116,7 @@ describe('Mercure', () => {
       mercure.subscribe(['topic1', 'topic2'])
       mercure.unsubscribe('topic1')
 
-      expect(mockFactory.lastCreatedSource?.url).toContain('topics=topic2')
+      expect(mockFactory.lastCreatedSource?.url).toContain('topic=topic2')
       expect(mockFactory.lastCreatedSource?.url).not.toContain('topic1')
     })
 
@@ -128,7 +128,7 @@ describe('Mercure', () => {
       mercure.subscribe(['topic1', 'topic2', 'topic3'])
       mercure.unsubscribe(['topic1', 'topic3'])
 
-      expect(mockFactory.lastCreatedSource?.url).toContain('topics=topic2')
+      expect(mockFactory.lastCreatedSource?.url).toContain('topic=topic2')
       expect(mockFactory.lastCreatedSource?.url).not.toContain('topic1')
       expect(mockFactory.lastCreatedSource?.url).not.toContain('topic3')
     })

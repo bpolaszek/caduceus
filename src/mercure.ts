@@ -84,7 +84,7 @@ export class Mercure {
       }
     }
 
-    const params: Record<string, string> = {topics: mergedTopics.join(',')}
+    const params: Record<string, string> = {topic: mergedTopics.join(',')}
     if (this.lastEventId !== null) {
       params.lastEventID = this.lastEventId
     }

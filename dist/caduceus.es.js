@@ -42,7 +42,7 @@ class b {
       return this.eventSource;
     if (this.eventSource && (this.eventSource.close(), n.length === 0))
       return this.eventSource;
-    const o = { topics: n.join(",") };
+    const o = { topic: n.join(",") };
     this.lastEventId !== null && (o.lastEventID = this.lastEventId);
     const h = this.hub + "?" + new URLSearchParams(o);
     return this.eventSource = this.options.eventSourceFactory.create(h), this.subscribedTopics = n, this.eventSource;
