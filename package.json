@@ -7,9 +7,6 @@
   "files": [
     "dist"
   ],
-  "bin": {
-    "caduceus": "./bin/caduceus.js"
-  },
   "main": "./dist/caduceus.umd.js",
   "module": "./dist/caduceus.es.js",
   "types": "./dist/index.d.ts",

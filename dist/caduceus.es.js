@@ -6,7 +6,7 @@ function d(s, e) {
 }
 class S {
   create(e) {
-    return new EventSource(e.toString());
+    return new EventSource(e.toString(), { withCredentials: !0 });
   }
 }
 const u = (s) => (s.includes("*") && (s = ["*"]), [...new Set(s)]), v = {
