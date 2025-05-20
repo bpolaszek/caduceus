@@ -1,5 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
-import {Mercure} from '../src'
+import {Mercure, DEFAULT_SUBSCRIBE_OPTIONS} from '../src'
 import {MockEventSourceFactory} from './utils/mock-event-source'
 
 describe('Mercure', () => {
@@ -67,7 +67,7 @@ describe('Mercure', () => {
       })
 
       mercure.subscribe('topic1')
-      mercure.subscribe('topic2', true)
+      mercure.subscribe('topic2', {append: true})
 
       expect(mockFactory.lastCreatedSource?.url).toContain('topic=topic1%2Ctopic2')
     })
@@ -78,7 +78,7 @@ describe('Mercure', () => {
       })
 
       mercure.subscribe('topic1')
-      mercure.subscribe('topic2', false)
+      mercure.subscribe('topic2', {append: false})
 
       expect(mockFactory.lastCreatedSource?.url).toContain('topic=topic2')
       expect(mockFactory.lastCreatedSource?.url).not.toContain('topic1')
@@ -104,6 +104,58 @@ describe('Mercure', () => {
       expect(mockFactory.lastCreatedSource?.url).toContain('topic=*')
       expect(mockFactory.lastCreatedSource?.url).not.toContain('topic1')
       expect(mockFactory.lastCreatedSource?.url).not.toContain('topic2')
+    })
+
+    it('should listen to multiple event types when specified', () => {
+      const handler = vi.fn()
+      const mercure = new Mercure(hub, {
+        eventSourceFactory: mockFactory,
+        handler,
+      })
+
+      mercure.subscribe('topic', {types: ['message', 'update', 'delete']})
+
+      const mockSource = mockFactory.lastCreatedSource!
+
+      // Simulate messages of different types
+      const testData1 = {foo: 'bar', action: 'create'}
+      mockSource.simulateMessage(testData1, '1', 'message')
+
+      const testData2 = {foo: 'updated', action: 'update'}
+      mockSource.simulateMessage(testData2, '2', 'update')
+
+      const testData3 = {id: '123', action: 'delete'}
+      mockSource.simulateMessage(testData3, '3', 'delete')
+
+      // Handler should be called for all three event types
+      expect(handler).toHaveBeenCalledTimes(3)
+      expect(handler).toHaveBeenCalledWith(testData1, expect.any(Object))
+      expect(handler).toHaveBeenCalledWith(testData2, expect.any(Object))
+      expect(handler).toHaveBeenCalledWith(testData3, expect.any(Object))
+    })
+
+    it('should use default message type when types not specified', () => {
+      const handler = vi.fn()
+      const mercure = new Mercure(hub, {
+        eventSourceFactory: mockFactory,
+        handler,
+      })
+
+      mercure.subscribe('topic') // Default types: ['message']
+
+      const mockSource = mockFactory.lastCreatedSource!
+
+      // Simulate message of default type
+      const testData = {foo: 'bar'}
+      mockSource.simulateMessage(testData)
+
+      // Simulate message of another type (should not trigger handler)
+      const ignoredData = {foo: 'ignored'}
+      mockSource.simulateMessage(ignoredData, '2', 'custom-type')
+
+      // Handler should only be called once for the 'message' type
+      expect(handler).toHaveBeenCalledTimes(1)
+      expect(handler).toHaveBeenCalledWith(testData, expect.any(Object))
     })
   })
 
@@ -175,7 +227,7 @@ describe('Mercure', () => {
       mockSource.simulateMessage({foo: 'bar'}, 'event-123')
 
       // Force a reconnection to see if lastEventId is used
-      mercure.subscribe('topic2', true)
+      mercure.subscribe('topic2', {append: true})
 
       expect(mockFactory.lastCreatedSource?.url).toContain('lastEventID=event-123')
     })
@@ -205,10 +257,30 @@ describe('Mercure', () => {
       mercure.subscribe('topic1')
       const firstSource = mockFactory.lastCreatedSource
 
-      mercure.subscribe('topic2', false) // Replace instead of append
+      mercure.subscribe('topic2', {append: false}) // Replace instead of append
 
       expect(firstSource?.isClosed).toBe(true)
       expect(mockFactory.lastCreatedSource).not.toBe(firstSource)
+    })
+
+    it('should use the default subscribe options when not provided', () => {
+      const handler = vi.fn()
+      const mercure = new Mercure(hub, {
+        eventSourceFactory: mockFactory,
+        handler,
+      })
+
+      mercure.subscribe('topic')
+
+      const mockSource = mockFactory.lastCreatedSource!
+
+      // Should have default options with 'message' type
+      mockSource.simulateMessage({test: 'data'})
+      expect(handler).toHaveBeenCalledTimes(1)
+
+      // Other types should not trigger the handler
+      mockSource.simulateMessage({ignored: true}, '2', 'custom')
+      expect(handler).toHaveBeenCalledTimes(1)
     })
   })
 })

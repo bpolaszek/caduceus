@@ -5,7 +5,7 @@ type Listener = (data: any, event: MercureMessageEvent) => void
 
 export type MercureMessageEvent = Pick<MessageEvent, 'data' | 'lastEventId'>
 export interface EventSourceInterface {
-  onmessage: ((event: MercureMessageEvent) => void) | null
+  addEventListener(type: string, callback: (event: MercureMessageEvent) => void): void
   close(): void
 }
 
@@ -19,11 +19,6 @@ export class DefaultEventSourceFactory implements EventSourceFactory {
   }
 }
 
-export type MercureOptions = {
-  handler: Listener
-  eventSourceFactory?: EventSourceFactory
-}
-
 const resolveSubscribedTopics = (topics: Topic[]): Topic[] => {
   if (topics.includes('*')) {
     topics = ['*']
@@ -31,9 +26,24 @@ const resolveSubscribedTopics = (topics: Topic[]): Topic[] => {
   return [...new Set(topics)]
 }
 
-const DEAULT_OPTIONS: MercureOptions = {
+export type MercureOptions = {
+  handler: Listener
+  eventSourceFactory?: EventSourceFactory
+}
+
+const DEFAULT_MERCURE_OPTIONS: MercureOptions = {
   handler: () => {},
   eventSourceFactory: new DefaultEventSourceFactory(),
+}
+
+export type SubscribeOptions = {
+  append: boolean
+  types: string[]
+}
+
+export const DEFAULT_SUBSCRIBE_OPTIONS: SubscribeOptions = {
+  append: true,
+  types: ['message'],
 }
 
 export class Mercure {
@@ -46,18 +56,26 @@ export class Mercure {
     private readonly hub: string | URL,
     options: Partial<MercureOptions> = {}
   ) {
-    this.options = {...DEAULT_OPTIONS, ...options}
+    this.options = {...DEFAULT_MERCURE_OPTIONS, ...options}
   }
 
-  subscribe(topic: Topic | Topic[], append: boolean = true): void {
+  subscribe(topic: Topic | Topic[], options: Partial<SubscribeOptions> = {}): void {
+    const {append, types} = {...DEFAULT_SUBSCRIBE_OPTIONS, ...options}
     const topics = Array.isArray(topic) ? topic : [topic]
     this.eventSource = this.connect(topics, !append)
     const {handler: handle} = this.options
 
-    this.eventSource.onmessage = (event: MercureMessageEvent) => {
+    const messageHandler = (event: MercureMessageEvent) => {
       this.lastEventId = event.lastEventId
       const data = JSON.parse(event.data)
       handle(data, event)
+    }
+
+    // Remove existing event listeners by closing and recreating the connection
+    if (types && types.length > 0) {
+      for (const type of types) {
+        this.eventSource.addEventListener(type, messageHandler)
+      }
     }
   }
 

@@ -2,7 +2,7 @@ type Topic = string;
 type Listener = (data: any, event: MercureMessageEvent) => void;
 export type MercureMessageEvent = Pick<MessageEvent, 'data' | 'lastEventId'>;
 export interface EventSourceInterface {
-    onmessage: ((event: MercureMessageEvent) => void) | null;
+    addEventListener(type: string, callback: (event: MercureMessageEvent) => void): void;
     close(): void;
 }
 export interface EventSourceFactory {
@@ -15,6 +15,11 @@ export type MercureOptions = {
     handler: Listener;
     eventSourceFactory?: EventSourceFactory;
 };
+export type SubscribeOptions = {
+    append: boolean;
+    types: string[];
+};
+export declare const DEFAULT_SUBSCRIBE_OPTIONS: SubscribeOptions;
 export declare class Mercure {
     private readonly hub;
     private subscribedTopics;
@@ -22,7 +27,7 @@ export declare class Mercure {
     private lastEventId;
     private readonly options;
     constructor(hub: string | URL, options?: Partial<MercureOptions>);
-    subscribe(topic: Topic | Topic[], append?: boolean): void;
+    subscribe(topic: Topic | Topic[], options?: Partial<SubscribeOptions>): void;
     unsubscribe(topic: Topic | Topic[]): void;
     private connect;
 }

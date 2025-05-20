@@ -1,4 +1,4 @@
-import {Mercure, MercureMessageEvent, MercureOptions} from './mercure.ts'
+import {Mercure, MercureMessageEvent, MercureOptions, SubscribeOptions} from './mercure.ts'
 
 type ResourceListener = (resource: ApiResource) => Listener
 type Listener = (data: ApiResource, event: MercureMessageEvent) => void
@@ -9,10 +9,14 @@ type ApiResource = Record<string, any> & {
 
 type HydraSynchronizerOptions = MercureOptions & {
   resourceListener: ResourceListener
+  subscribeOptions?: Partial<SubscribeOptions>
 }
 
 const DEFAULT_OPTIONS: Partial<HydraSynchronizerOptions> = {
   resourceListener: (resource: ApiResource) => (data: any) => Object.assign(resource, data),
+  subscribeOptions: {
+    types: ['message'],
+  },
 }
 
 export class HydraSynchronizer {
@@ -33,13 +37,16 @@ export class HydraSynchronizer {
     })
   }
 
-  sync(resource: ApiResource, topic?: string) {
+  sync(resource: ApiResource, topic?: string, subscribeOptions?: Partial<SubscribeOptions>) {
     const resolvedTopic = topic ?? resource['@id']
     if (this.listeners.has(resource['@id'])) {
       return
     }
     this.listeners.set(resource['@id'], [this.options.resourceListener(resource)])
-    this.mercure.subscribe(resolvedTopic)
+    this.mercure.subscribe(resolvedTopic, {
+      ...this.options.subscribeOptions,
+      ...subscribeOptions,
+    })
   }
 
   on(resource: ApiResource, callback: Listener) {
