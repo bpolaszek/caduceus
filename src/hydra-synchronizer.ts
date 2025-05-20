@@ -17,7 +17,7 @@ const DEFAULT_OPTIONS: Partial<HydraSynchronizerOptions> = {
 
 export class HydraSynchronizer {
   public readonly mercure: Mercure
-  private readonly listeners: Map<Iri, Listener> = new Map()
+  private readonly listeners: Map<Iri, Listener[]> = new Map()
   private readonly options: HydraSynchronizerOptions
 
   constructor(hub: string | URL, options: Partial<HydraSynchronizerOptions> = {}) {
@@ -25,8 +25,8 @@ export class HydraSynchronizer {
     this.mercure = new Mercure(hub, {
       ...this.options,
       handler: (data: ApiResource, event: MercureMessageEvent) => {
-        const callback = this.listeners.get(data['@id'])
-        if (callback) {
+        const callbacks = this.listeners.get(data['@id'])
+        for (const callback of callbacks ?? []) {
           callback(data, event)
         }
       },
@@ -38,8 +38,14 @@ export class HydraSynchronizer {
     if (this.listeners.has(resource['@id'])) {
       return
     }
-    this.listeners.set(resource['@id'], this.options.resourceListener(resource))
+    this.listeners.set(resource['@id'], [this.options.resourceListener(resource)])
     this.mercure.subscribe(resolvedTopic)
+  }
+
+  on(resource: ApiResource, callback: Listener) {
+    const callbacks = this.listeners.get(resource['@id']) ?? []
+    callbacks.push(callback)
+    this.listeners.set(resource['@id'], [...new Set(callbacks)])
   }
 
   unsync(resource: ApiResource) {

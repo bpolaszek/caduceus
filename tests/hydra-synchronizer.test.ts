@@ -221,4 +221,137 @@ describe('HydraSynchronizer', () => {
       expect(resource).not.toHaveProperty('pages')
     })
   })
+
+  describe('on', () => {
+    it('should register additional callbacks for a resource', () => {
+      const synchronizer = new HydraSynchronizer(hub, {
+        eventSourceFactory: mockFactory,
+      })
+
+      const resource = {'@id': '/api/books/1', title: 'Original Title'}
+      synchronizer.sync(resource)
+
+      // Add two custom callbacks
+      const callback1 = vi.fn()
+      const callback2 = vi.fn()
+
+      synchronizer.on(resource, callback1)
+      synchronizer.on(resource, callback2)
+
+      // Simulate receiving an update
+      const mockSource = mockFactory.lastCreatedSource!
+      const update = {'@id': '/api/books/1', title: 'Updated Title'}
+      mockSource.simulateMessage(update)
+
+      // Both callbacks should have been called with the update data
+      expect(callback1).toHaveBeenCalledWith(update, expect.any(Object))
+      expect(callback2).toHaveBeenCalledWith(update, expect.any(Object))
+
+      // The default listener should also have updated the resource
+      expect(resource.title).toBe('Updated Title')
+    })
+
+    it('should not add duplicate callbacks', () => {
+      const synchronizer = new HydraSynchronizer(hub, {
+        eventSourceFactory: mockFactory,
+      })
+
+      const resource = {'@id': '/api/books/1', title: 'Original Title'}
+      synchronizer.sync(resource)
+
+      // Create a callback and add it twice
+      const callback = vi.fn()
+
+      synchronizer.on(resource, callback)
+      synchronizer.on(resource, callback) // Should be deduplicated
+
+      // Simulate receiving an update
+      const mockSource = mockFactory.lastCreatedSource!
+      const update = {'@id': '/api/books/1', title: 'Updated Title'}
+      mockSource.simulateMessage(update)
+
+      // Callback should have been called exactly once despite being added twice
+      expect(callback).toHaveBeenCalledTimes(1)
+    })
+
+    it('should allow callbacks to receive and modify update data', () => {
+      const synchronizer = new HydraSynchronizer(hub, {
+        eventSourceFactory: mockFactory,
+      })
+
+      const resource = {'@id': '/api/books/1', title: 'Original Title'}
+
+      // Create a tracking object to verify callback execution order
+      const tracker: any = {callOrder: []}
+
+      // Custom callback that tracks it was called first and adds a property
+      const customCallback = vi.fn().mockImplementation((data) => {
+        tracker.callOrder.push('custom')
+        data.customProperty = 'Custom Value'
+      })
+
+      synchronizer.sync(resource)
+      synchronizer.on(resource, customCallback)
+
+      // Add another callback to verify the first one's changes are visible
+      const verifyCallback = vi.fn().mockImplementation((data) => {
+        tracker.callOrder.push('verify')
+        expect(data.customProperty).toBe('Custom Value')
+      })
+
+      synchronizer.on(resource, verifyCallback)
+
+      // Simulate receiving an update
+      const mockSource = mockFactory.lastCreatedSource!
+      const update = {'@id': '/api/books/1', title: 'Updated Title'}
+      mockSource.simulateMessage(update)
+
+      // Verify both callbacks were called
+      expect(customCallback).toHaveBeenCalled()
+      expect(verifyCallback).toHaveBeenCalled()
+
+      // Default resource listener should still update the resource
+      expect(resource.title).toBe('Updated Title')
+    })
+
+    it('should handle unsync and resync with additional listeners', () => {
+      const synchronizer = new HydraSynchronizer(hub, {
+        eventSourceFactory: mockFactory,
+      })
+
+      const resource = {'@id': '/api/books/1', title: 'Original Title'}
+      synchronizer.sync(resource)
+
+      // Add a custom callback
+      const callback = vi.fn()
+      synchronizer.on(resource, callback)
+
+      // Unsync the resource
+      synchronizer.unsync(resource)
+
+      // Resync the resource
+      synchronizer.sync(resource)
+
+      // Simulate receiving an update
+      const mockSource = mockFactory.lastCreatedSource!
+      const update = {'@id': '/api/books/1', title: 'Updated Title'}
+      mockSource.simulateMessage(update)
+
+      // The default listener should update the resource
+      expect(resource.title).toBe('Updated Title')
+
+      // The custom callback should not be called since it was removed during unsync
+      expect(callback).not.toHaveBeenCalled()
+
+      // Add the callback again after resyncing
+      synchronizer.on(resource, callback)
+
+      // Simulate another update
+      const update2 = {'@id': '/api/books/1', title: 'Updated Again'}
+      mockSource.simulateMessage(update2)
+
+      // Now the callback should be called
+      expect(callback).toHaveBeenCalledWith(update2, expect.any(Object))
+    })
+  })
 })

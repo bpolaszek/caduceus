@@ -14,6 +14,7 @@ export declare class HydraSynchronizer {
     private readonly options;
     constructor(hub: string | URL, options?: Partial<HydraSynchronizerOptions>);
     sync(resource: ApiResource, topic?: string): void;
+    on(resource: ApiResource, callback: Listener): void;
     unsync(resource: ApiResource): void;
 }
 export {};

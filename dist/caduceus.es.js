@@ -1,72 +1,77 @@
 var l = Object.defineProperty;
-var a = (s, e, t) => e in s ? l(s, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : s[e] = t;
-var i = (s, e, t) => a(s, typeof e != "symbol" ? e + "" : e, t);
-function d(s, e) {
-  return s < e ? -1 : s > e ? 1 : 0;
+var a = (t, e, s) => e in t ? l(t, e, { enumerable: !0, configurable: !0, writable: !0, value: s }) : t[e] = s;
+var r = (t, e, s) => a(t, typeof e != "symbol" ? e + "" : e, s);
+function d(t, e) {
+  return t < e ? -1 : t > e ? 1 : 0;
 }
 class S {
   create(e) {
     return new EventSource(e.toString(), { withCredentials: !0 });
   }
 }
-const u = (s) => (s.includes("*") && (s = ["*"]), [...new Set(s)]), v = {
+const u = (t) => (t.includes("*") && (t = ["*"]), [...new Set(t)]), b = {
   handler: () => {
   },
   eventSourceFactory: new S()
 };
-class b {
-  constructor(e, t = {}) {
-    i(this, "subscribedTopics", []);
-    i(this, "eventSource", null);
-    i(this, "lastEventId", null);
-    i(this, "options");
-    this.hub = e, this.options = { ...v, ...t };
+class p {
+  constructor(e, s = {}) {
+    r(this, "subscribedTopics", []);
+    r(this, "eventSource", null);
+    r(this, "lastEventId", null);
+    r(this, "options");
+    this.hub = e, this.options = { ...b, ...s };
   }
-  subscribe(e, t = !0) {
-    const r = Array.isArray(e) ? e : [e];
-    this.eventSource = this.connect(r, !t);
+  subscribe(e, s = !0) {
+    const n = Array.isArray(e) ? e : [e];
+    this.eventSource = this.connect(n, !s);
     const { handler: c } = this.options;
-    this.eventSource.onmessage = (n) => {
-      this.lastEventId = n.lastEventId;
-      const o = JSON.parse(n.data);
-      c(o, n);
+    this.eventSource.onmessage = (i) => {
+      this.lastEventId = i.lastEventId;
+      const o = JSON.parse(i.data);
+      c(o, i);
     };
   }
   unsubscribe(e) {
-    const t = Array.isArray(e) ? e : [e], r = this.subscribedTopics.filter((c) => !t.includes(c));
-    this.connect(r, !0);
+    const s = Array.isArray(e) ? e : [e], n = this.subscribedTopics.filter((c) => !s.includes(c));
+    this.connect(n, !0);
   }
-  connect(e, t) {
-    const r = t ? [] : u(this.subscribedTopics), c = u(e), n = u([...r, ...c]);
-    if (this.eventSource && n.length > 0 && d(r, n) === 0)
+  connect(e, s) {
+    const n = s ? [] : u(this.subscribedTopics), c = u(e), i = u([...n, ...c]);
+    if (this.eventSource && i.length > 0 && d(n, i) === 0)
       return this.eventSource;
-    if (this.eventSource && (this.eventSource.close(), n.length === 0))
+    if (this.eventSource && (this.eventSource.close(), i.length === 0))
       return this.eventSource;
-    const o = { topic: n.join(",") };
+    const o = { topic: i.join(",") };
     this.lastEventId !== null && (o.lastEventID = this.lastEventId);
     const h = this.hub + "?" + new URLSearchParams(o);
-    return this.eventSource = this.options.eventSourceFactory.create(h), this.subscribedTopics = n, this.eventSource;
+    return this.eventSource = this.options.eventSourceFactory.create(h), this.subscribedTopics = i, this.eventSource;
   }
 }
-const p = {
-  resourceListener: (s) => (e) => Object.assign(s, e)
+const v = {
+  resourceListener: (t) => (e) => Object.assign(t, e)
 };
 class f {
-  constructor(e, t = {}) {
-    i(this, "mercure");
-    i(this, "listeners", /* @__PURE__ */ new Map());
-    i(this, "options");
-    this.options = { ...p, ...t }, this.mercure = new b(e, {
+  constructor(e, s = {}) {
+    r(this, "mercure");
+    r(this, "listeners", /* @__PURE__ */ new Map());
+    r(this, "options");
+    this.options = { ...v, ...s }, this.mercure = new p(e, {
       ...this.options,
-      handler: (r, c) => {
-        const n = this.listeners.get(r["@id"]);
-        n && n(r, c);
+      handler: (n, c) => {
+        const i = this.listeners.get(n["@id"]);
+        for (const o of i ?? [])
+          o(n, c);
       }
     });
   }
-  sync(e, t) {
-    const r = t ?? e["@id"];
-    this.listeners.has(e["@id"]) || (this.listeners.set(e["@id"], this.options.resourceListener(e)), this.mercure.subscribe(r));
+  sync(e, s) {
+    const n = s ?? e["@id"];
+    this.listeners.has(e["@id"]) || (this.listeners.set(e["@id"], [this.options.resourceListener(e)]), this.mercure.subscribe(n));
+  }
+  on(e, s) {
+    const n = this.listeners.get(e["@id"]) ?? [];
+    n.push(s), this.listeners.set(e["@id"], [...new Set(n)]);
   }
   unsync(e) {
     this.listeners.delete(e["@id"]);
@@ -75,5 +80,5 @@ class f {
 export {
   S as DefaultEventSourceFactory,
   f as HydraSynchronizer,
-  b as Mercure
+  p as Mercure
 };
