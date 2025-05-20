@@ -25,4 +25,7 @@ export default defineConfig({
       },
     },
   },
+  test: {
+    watch: false,
+  }
 });
