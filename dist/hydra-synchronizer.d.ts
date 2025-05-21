@@ -10,7 +10,7 @@ type HydraSynchronizerOptions = MercureOptions & {
     subscribeOptions?: Partial<SubscribeOptions>;
 };
 export declare class HydraSynchronizer {
-    readonly mercure: Mercure;
+    readonly connection: Mercure;
     private readonly listeners;
     private readonly options;
     constructor(hub: string | URL, options?: Partial<HydraSynchronizerOptions>);

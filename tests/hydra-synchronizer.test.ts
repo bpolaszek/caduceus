@@ -25,7 +25,7 @@ describe('HydraSynchronizer', () => {
       })
 
       expect(synchronizer).toBeDefined()
-      expect(synchronizer.mercure).toBeDefined()
+      expect(synchronizer.connection).toBeDefined()
     })
 
     it('should use a custom resource listener when provided', () => {
