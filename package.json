@@ -1,5 +1,5 @@
 {
-  "name": "caduceus",
+  "name": "bentools-caduceus",
   "type": "module",
   "description": "A lightweight TypeScript library for Mercure real-time updates integration with API Platform / Hydra resources.",
   "version": "1.0.0",
