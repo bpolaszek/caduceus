@@ -32,6 +32,22 @@ export class DefaultEventSourceFactory implements EventSourceFactory {
   }
 }
 
+export class CookieBasedAuthorization implements EventSourceFactory {
+  create(url: string | URL): EventSourceInterface {
+    return new EventSource(url.toString(), {withCredentials: true}) as EventSourceInterface
+  }
+}
+
+export class QueryParamAuthorization implements EventSourceFactory {
+  constructor(private readonly token: string) {}
+
+  create(url: string | URL): EventSourceInterface {
+    const parsedUrl = new URL(url.toString())
+    parsedUrl.searchParams.set('authorization', this.token)
+    return new EventSource(parsedUrl.toString()) as EventSourceInterface
+  }
+}
+
 const resolveSubscribedTopics = (topics: Topic[]): Topic[] => {
   if (topics.includes('*')) {
     topics = ['*']

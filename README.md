@@ -1,7 +1,7 @@
 # Caduceus
 
-[![npm](https://img.shields.io/npm/v/caduceus)](https://www.npmjs.com/package/caduceus)
-[![License](https://img.shields.io/github/license/caduceus/caduceus)](LICENSE)
+[![npm](https://img.shields.io/npm/v/bentools-caduceus)](https://www.npmjs.com/package/bentools-caduceus)
+[![License](https://img.shields.io/github/license/bpolaszek/caduceus)](LICENSE)
 
 Caduceus is a TypeScript library that simplifies real-time data synchronization between your client and server using the [Mercure protocol](https://mercure.rocks/). It provides an elegant way to subscribe to updates on API resources and keep your client-side data in sync with server changes.
 
@@ -165,6 +165,33 @@ constructor(hub: string | URL, options?: Partial<MercureOptions>)
 - `unsubscribe(topic: Topic | Topic[]): void` - Unsubscribe from one or more topics
 - `on(type: string, listener: Listener): void` - Add an event listener
 - `connect(): EventSourceInterface` - Connect to the Mercure hub
+
+### Authorization Factories
+
+#### CookieBasedAuthorization
+
+An `EventSourceFactory` implementation that uses the `mercureAuthorization` cookie for authorization when connecting to a Mercure hub.
+
+```typescript
+import { CookieBasedAuthorization, Mercure } from 'caduceus'
+
+const mercure = new Mercure('https://example.com/.well-known/mercure', {
+  eventSourceFactory: new CookieBasedAuthorization(),
+});
+```
+
+#### QueryParamAuthorization
+
+An `EventSourceFactory` implementation that adds an authorization token as a query parameter when connecting to a Mercure hub.
+
+```typescript
+import { QueryParamAuthorization, Mercure } from 'caduceus'
+
+const token = 'your-jwt-token';
+const mercure = new Mercure('https://example.com/.well-known/mercure', {
+  eventSourceFactory: new QueryParamAuthorization(token),
+});
+```
 
 ### HydraSynchronizer
 

@@ -1,7 +1,7 @@
-var h = Object.defineProperty;
-var u = (e, s, t) => s in e ? h(e, s, { enumerable: !0, configurable: !0, writable: !0, value: t }) : e[s] = t;
-var r = (e, s, t) => u(e, typeof s != "symbol" ? s + "" : s, t);
-function a(e, s) {
+var a = Object.defineProperty;
+var h = (e, s, t) => s in e ? a(e, s, { enumerable: !0, configurable: !0, writable: !0, value: t }) : e[s] = t;
+var r = (e, s, t) => h(e, typeof s != "symbol" ? s + "" : s, t);
+function u(e, s) {
   return e < s ? -1 : e > s ? 1 : 0;
 }
 class l {
@@ -9,10 +9,24 @@ class l {
     return new EventSource(s.toString());
   }
 }
-const o = (e) => (e.includes("*") && (e = ["*"]), [...new Set(e)]), b = {
+class T {
+  create(s) {
+    return new EventSource(s.toString(), { withCredentials: !0 });
+  }
+}
+class E {
+  constructor(s) {
+    this.token = s;
+  }
+  create(s) {
+    const t = new URL(s.toString());
+    return t.searchParams.set("authorization", this.token), new EventSource(t.toString());
+  }
+}
+const o = (e) => (e.includes("*") && (e = ["*"]), [...new Set(e)]), d = {
   eventSourceFactory: new l(),
   lastEventId: null
-}, d = {
+}, b = {
   append: !0
 };
 class p {
@@ -23,10 +37,10 @@ class p {
     r(this, "lastEventId", null);
     r(this, "options");
     r(this, "listeners", /* @__PURE__ */ new Map());
-    this.hub = s, this.options = { ...b, ...t }, this.lastEventId = this.options.lastEventId;
+    this.hub = s, this.options = { ...d, ...t }, this.lastEventId = this.options.lastEventId;
   }
   subscribe(s, t = {}) {
-    const { append: i } = { ...d, ...t }, n = Array.isArray(s) ? s : [s];
+    const { append: i } = { ...b, ...t }, n = Array.isArray(s) ? s : [s];
     this.subscribedTopics = o(
       i ? [...this.currentlySubscribedTopics, ...this.subscribedTopics, ...n] : n
     );
@@ -39,7 +53,7 @@ class p {
     this.subscribedTopics = o(i), this.connect();
   }
   connect() {
-    if (this.eventSource && this.subscribedTopics.length > 0 && a(this.subscribedTopics, this.currentlySubscribedTopics) === 0)
+    if (this.eventSource && this.subscribedTopics.length > 0 && u(this.subscribedTopics, this.currentlySubscribedTopics) === 0)
       return this.eventSource;
     if (this.eventSource && this.eventSource.close(), this.subscribedTopics.length === 0)
       throw new Error("No topics to subscribe to.");
@@ -77,7 +91,7 @@ const S = {
     append: !0
   }
 };
-class T {
+class f {
   constructor(s, t = {}) {
     r(this, "connection");
     r(this, "listeners", /* @__PURE__ */ new Map());
@@ -104,8 +118,10 @@ class T {
   }
 }
 export {
-  d as DEFAULT_SUBSCRIBE_OPTIONS,
+  T as CookieBasedAuthorization,
+  b as DEFAULT_SUBSCRIBE_OPTIONS,
   l as DefaultEventSourceFactory,
-  T as HydraSynchronizer,
-  p as Mercure
+  f as HydraSynchronizer,
+  p as Mercure,
+  E as QueryParamAuthorization
 };

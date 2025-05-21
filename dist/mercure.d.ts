@@ -22,6 +22,14 @@ export interface EventSourceFactory {
 export declare class DefaultEventSourceFactory implements EventSourceFactory {
     create(url: string | URL): EventSourceInterface;
 }
+export declare class CookieBasedAuthorization implements EventSourceFactory {
+    create(url: string | URL): EventSourceInterface;
+}
+export declare class QueryParamAuthorization implements EventSourceFactory {
+    private readonly token;
+    constructor(token: string);
+    create(url: string | URL): EventSourceInterface;
+}
 export declare const DEFAULT_SUBSCRIBE_OPTIONS: SubscribeOptions;
 export declare class Mercure {
     private readonly hub;
