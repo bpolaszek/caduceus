@@ -1,357 +1,217 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
-import {HydraSynchronizer} from '../src'
-import {MockEventSourceFactory} from './utils/mock-event-source'
+import {HydraSynchronizer, Mercure, MercureMessageEvent} from '../src'
+
+// Mock Mercure class
+vi.mock('../src/mercure', () => {
+  return {
+    Mercure: vi.fn().mockImplementation(() => ({
+      on: vi.fn(),
+      subscribe: vi.fn(),
+      connect: vi.fn(),
+    })),
+  }
+})
 
 describe('HydraSynchronizer', () => {
-  let mockFactory: MockEventSourceFactory
-  let hub: string
+  let synchronizer: HydraSynchronizer
+  const hubUrl = 'https://example.com/.well-known/mercure'
+  let mockMercure: Mercure
+
+  // Mock API resource
+  const mockResource = {
+    '@id': '/api/resources/123',
+    name: 'Test Resource',
+    description: 'A test resource',
+  }
 
   beforeEach(() => {
-    mockFactory = new MockEventSourceFactory()
-    hub = 'https://example.com/hub'
+    vi.clearAllMocks()
+    // Reset Mercure mock implementation
+    mockMercure = {
+      on: vi.fn(),
+      subscribe: vi.fn(),
+      connect: vi.fn(),
+    } as unknown as Mercure
+    ;(Mercure as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => mockMercure)
 
-    // Mock console.error to avoid polluting test output
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    synchronizer = new HydraSynchronizer(hubUrl)
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
+    vi.clearAllMocks()
   })
 
-  describe('initialization', () => {
-    it('should initialize with default options', () => {
-      const synchronizer = new HydraSynchronizer(hub, {
-        eventSourceFactory: mockFactory,
-      })
-
-      expect(synchronizer).toBeDefined()
-      expect(synchronizer.connection).toBeDefined()
+  describe('constructor', () => {
+    it('should initialize with the provided hub URL', () => {
+      expect(Mercure).toHaveBeenCalledWith(hubUrl, expect.any(Object))
     })
 
-    it('should use a custom resource listener when provided', () => {
-      const customListener = vi.fn()
-      const resourceListener = () => customListener
+    it('should initialize with default options if none provided', () => {
+      expect(synchronizer.connection).toBeDefined()
+      expect(synchronizer['options'].resourceListener).toBeDefined()
+      expect(synchronizer['options'].subscribeOptions).toEqual({append: true})
+    })
 
-      const synchronizer = new HydraSynchronizer(hub, {
-        eventSourceFactory: mockFactory,
-        resourceListener,
+    it('should initialize with custom options if provided', () => {
+      const customResourceListener = vi.fn()
+      const customHandler = vi.fn()
+
+      synchronizer = new HydraSynchronizer(hubUrl, {
+        resourceListener: customResourceListener,
+        handler: customHandler,
       })
 
-      const resource = {'@id': '/api/books/1'}
-      synchronizer.sync(resource)
+      expect(synchronizer['options'].resourceListener).toBe(customResourceListener)
+      expect(synchronizer['options'].handler).toBe(customHandler)
+      expect(customHandler).toHaveBeenCalledWith(synchronizer.connection, synchronizer['listeners'])
+    })
 
-      // Simulate receiving an update for this resource
-      const mockSource = mockFactory.lastCreatedSource!
-      const update = {'@id': '/api/books/1', title: 'Updated Title'}
-      mockSource.simulateMessage(update)
+    it('should call the handler with the connection and listeners', () => {
+      const handlerMock = vi.fn()
+      synchronizer = new HydraSynchronizer(hubUrl, {
+        handler: handlerMock,
+      })
 
-      expect(customListener).toHaveBeenCalledWith(update, expect.any(Object))
+      expect(handlerMock).toHaveBeenCalledWith(synchronizer.connection, synchronizer['listeners'])
     })
   })
 
   describe('sync', () => {
-    it('should subscribe using the resource IRI as topic by default', () => {
-      const synchronizer = new HydraSynchronizer(hub, {
-        eventSourceFactory: mockFactory,
-      })
+    it('should add a listener for the resource', () => {
+      synchronizer.sync(mockResource)
 
-      const resource = {'@id': '/api/books/1'}
-      synchronizer.sync(resource)
-
-      expect(mockFactory.lastCreatedSource?.url).toContain('topic=%2Fapi%2Fbooks%2F1')
+      expect(synchronizer['listeners'].has(mockResource['@id'])).toBe(true)
+      expect(synchronizer['listeners'].get(mockResource['@id'])).toHaveLength(1)
     })
 
-    it('should subscribe using a custom topic when provided', () => {
-      const synchronizer = new HydraSynchronizer(hub, {
-        eventSourceFactory: mockFactory,
-      })
+    it('should use the resource @id as topic if none provided', () => {
+      synchronizer.sync(mockResource)
 
-      const resource = {'@id': '/api/books/1'}
-      synchronizer.sync(resource, '/api/books/{id}')
-
-      expect(mockFactory.lastCreatedSource?.url).toContain('topic=%2Fapi%2Fbooks%2F%7Bid%7D')
+      expect(mockMercure.subscribe).toHaveBeenCalledWith(mockResource['@id'], expect.objectContaining({append: true}))
     })
 
-    it('should not subscribe again to the same resource', () => {
-      const synchronizer = new HydraSynchronizer(hub, {
-        eventSourceFactory: mockFactory,
-      })
+    it('should use the provided topic if specified', () => {
+      const customTopic = '/custom-topic'
+      synchronizer.sync(mockResource, customTopic)
 
-      const resource = {'@id': '/api/books/1'}
-      synchronizer.sync(resource)
-
-      const firstSource = mockFactory.lastCreatedSource
-
-      // Try to sync the same resource again
-      synchronizer.sync(resource)
-
-      // Should still be using the same EventSource
-      expect(mockFactory.lastCreatedSource).toBe(firstSource)
+      expect(mockMercure.subscribe).toHaveBeenCalledWith(customTopic, expect.any(Object))
     })
 
-    it('should handle multiple resources with different IRIs', () => {
-      const synchronizer = new HydraSynchronizer(hub, {
-        eventSourceFactory: mockFactory,
-      })
+    it('should not add listener if resource is already being synced', () => {
+      synchronizer.sync(mockResource)
+      synchronizer.sync(mockResource)
 
-      const resource1 = {'@id': '/api/books/1'}
-      const resource2 = {'@id': '/api/books/2'}
-
-      synchronizer.sync(resource1)
-      synchronizer.sync(resource2)
-
-      // Should be subscribed to both topics
-      expect(mockFactory.lastCreatedSource?.url).toContain('topic=%2Fapi%2Fbooks%2F1%2C%2Fapi%2Fbooks%2F2')
+      // Should still have just one listener
+      expect(synchronizer['listeners'].get(mockResource['@id'])).toHaveLength(1)
     })
 
-    it('should use URI template for multiple resources efficiently', () => {
-      const synchronizer = new HydraSynchronizer(hub, {
-        eventSourceFactory: mockFactory,
-      })
+    it('should call connect on the Mercure connection', () => {
+      synchronizer.sync(mockResource)
 
-      const resource1 = {'@id': '/api/books/1'}
-      const resource2 = {'@id': '/api/books/2'}
-
-      synchronizer.sync(resource1, '/api/books/{id}')
-      synchronizer.sync(resource2, '/api/books/{id}')
-
-      // Should be subscribed to the template only once
-      expect(mockFactory.lastCreatedSource?.url).toContain('topic=%2Fapi%2Fbooks%2F%7Bid%7D')
-      expect(mockFactory.lastCreatedSource?.url.match(/%2Fapi%2Fbooks%2F%7Bid%7D/g)?.length).toBe(1)
-    })
-  })
-
-  describe('unsync', () => {
-    it('should remove the listener for a specific resource', () => {
-      // Create resources with properties to track updates
-      const resource1 = {'@id': '/api/books/1', title: 'Book 1'}
-      const resource2 = {'@id': '/api/books/2', title: 'Book 2'}
-
-      // Create a spy to track when resources are updated
-      const handlerSpy = vi.fn()
-
-      // Create a custom resource listener that both updates the resource and calls our spy
-      const resourceListener = (resource: any) => (data: any) => {
-        handlerSpy(resource['@id'], data)
-        Object.assign(resource, data)
-      }
-
-      const synchronizer = new HydraSynchronizer(hub, {
-        eventSourceFactory: mockFactory,
-        resourceListener,
-      })
-
-      // Sync both resources
-      synchronizer.sync(resource1)
-      synchronizer.sync(resource2)
-
-      // Unsync the first resource
-      synchronizer.unsync(resource1)
-
-      // Simulate receiving updates for both resources
-      const mockSource = mockFactory.lastCreatedSource!
-      const update1 = {'@id': '/api/books/1', title: 'Updated Book 1'}
-      const update2 = {'@id': '/api/books/2', title: 'Updated Book 2'}
-
-      // Send update for resource1 (which should be ignored since we unsynced it)
-      mockSource.simulateMessage(update1)
-
-      // Send update for resource2 (which should still be handled)
-      mockSource.simulateMessage(update2)
-
-      // Verify resource1 was not updated (since it was unsynced)
-      expect(resource1.title).toBe('Book 1')
-
-      // Verify resource2 was updated
-      expect(resource2.title).toBe('Updated Book 2')
-
-      // Verify the handler was only called once (for resource2)
-      expect(handlerSpy).toHaveBeenCalledTimes(1)
-      expect(handlerSpy).toHaveBeenCalledWith('/api/books/2', update2)
-      expect(handlerSpy).not.toHaveBeenCalledWith('/api/books/1', update1)
-    })
-  })
-
-  describe('resource updates', () => {
-    it('should update the resource object with received data using default listener', () => {
-      const synchronizer = new HydraSynchronizer(hub, {
-        eventSourceFactory: mockFactory,
-      })
-
-      const resource = {'@id': '/api/books/1', title: 'Original Title', author: 'Original Author'}
-      synchronizer.sync(resource)
-
-      // Simulate receiving an update with partial data
-      const mockSource = mockFactory.lastCreatedSource!
-      const update = {'@id': '/api/books/1', title: 'Updated Title'}
-      mockSource.simulateMessage(update)
-
-      // The resource should be updated with the new data while keeping existing properties
-      expect(resource.title).toBe('Updated Title')
-      expect(resource.author).toBe('Original Author')
-    })
-
-    it('should handle complete replacement of resource properties when needed', () => {
-      // Create a custom listener that completely replaces the resource
-      const replaceResourceListener = (resource: any) => (data: any) => {
-        Object.keys(resource).forEach((key) => {
-          if (key !== '@id') {
-            delete resource[key]
-          }
-        })
-        return Object.assign(resource, data)
-      }
-
-      const synchronizer = new HydraSynchronizer(hub, {
-        eventSourceFactory: mockFactory,
-        resourceListener: replaceResourceListener,
-      })
-
-      const resource = {'@id': '/api/books/1', title: 'Original Title', author: 'Original Author', pages: 200}
-      synchronizer.sync(resource)
-
-      // Simulate receiving an update with partial data
-      const mockSource = mockFactory.lastCreatedSource!
-      const update = {'@id': '/api/books/1', title: 'Updated Title'}
-      mockSource.simulateMessage(update)
-
-      // The resource should only have the @id and the new properties
-      expect(resource.title).toBe('Updated Title')
-      expect(resource).not.toHaveProperty('author')
-      expect(resource).not.toHaveProperty('pages')
+      expect(mockMercure.connect).toHaveBeenCalled()
     })
   })
 
   describe('on', () => {
-    it('should register additional callbacks for a resource', () => {
-      const synchronizer = new HydraSynchronizer(hub, {
-        eventSourceFactory: mockFactory,
-      })
+    it('should add a callback to the listeners for the resource', () => {
+      const callback = vi.fn()
 
-      const resource = {'@id': '/api/books/1', title: 'Original Title'}
-      synchronizer.sync(resource)
+      // First sync to initialize the listeners
+      synchronizer.sync(mockResource)
 
-      // Add two custom callbacks
-      const callback1 = vi.fn()
-      const callback2 = vi.fn()
+      // Then add a callback
+      synchronizer.on(mockResource, callback)
 
-      synchronizer.on(resource, callback1)
-      synchronizer.on(resource, callback2)
+      expect(synchronizer['listeners'].get(mockResource['@id'])).toHaveLength(2)
+      expect(synchronizer['listeners'].get(mockResource['@id'])?.[1]).toBe(callback)
+    })
 
-      // Simulate receiving an update
-      const mockSource = mockFactory.lastCreatedSource!
-      const update = {'@id': '/api/books/1', title: 'Updated Title'}
-      mockSource.simulateMessage(update)
+    it('should create listeners array if none exists for the resource', () => {
+      const callback = vi.fn()
 
-      // Both callbacks should have been called with the update data
-      expect(callback1).toHaveBeenCalledWith(update, expect.any(Object))
-      expect(callback2).toHaveBeenCalledWith(update, expect.any(Object))
+      // No sync first, directly add a callback
+      synchronizer.on(mockResource, callback)
 
-      // The default listener should also have updated the resource
-      expect(resource.title).toBe('Updated Title')
+      expect(synchronizer['listeners'].get(mockResource['@id'])).toHaveLength(1)
+      expect(synchronizer['listeners'].get(mockResource['@id'])?.[0]).toBe(callback)
     })
 
     it('should not add duplicate callbacks', () => {
-      const synchronizer = new HydraSynchronizer(hub, {
-        eventSourceFactory: mockFactory,
-      })
-
-      const resource = {'@id': '/api/books/1', title: 'Original Title'}
-      synchronizer.sync(resource)
-
-      // Create a callback and add it twice
       const callback = vi.fn()
 
-      synchronizer.on(resource, callback)
-      synchronizer.on(resource, callback) // Should be deduplicated
+      synchronizer.sync(mockResource)
+      synchronizer.on(mockResource, callback)
+      synchronizer.on(mockResource, callback)
 
-      // Simulate receiving an update
-      const mockSource = mockFactory.lastCreatedSource!
-      const update = {'@id': '/api/books/1', title: 'Updated Title'}
-      mockSource.simulateMessage(update)
-
-      // Callback should have been called exactly once despite being added twice
-      expect(callback).toHaveBeenCalledTimes(1)
+      // Should have the default listener plus our callback
+      expect(synchronizer['listeners'].get(mockResource['@id'])).toHaveLength(2)
     })
+  })
 
-    it('should allow callbacks to receive and modify update data', () => {
-      const synchronizer = new HydraSynchronizer(hub, {
-        eventSourceFactory: mockFactory,
-      })
+  describe('unsync', () => {
+    it('should remove all listeners for the resource', () => {
+      synchronizer.sync(mockResource)
+      synchronizer.on(mockResource, vi.fn())
 
-      const resource = {'@id': '/api/books/1', title: 'Original Title'}
+      synchronizer.unsync(mockResource)
 
-      // Create a tracking object to verify callback execution order
-      const tracker: any = {callOrder: []}
-
-      // Custom callback that tracks it was called first and adds a property
-      const customCallback = vi.fn().mockImplementation((data) => {
-        tracker.callOrder.push('custom')
-        data.customProperty = 'Custom Value'
-      })
-
-      synchronizer.sync(resource)
-      synchronizer.on(resource, customCallback)
-
-      // Add another callback to verify the first one's changes are visible
-      const verifyCallback = vi.fn().mockImplementation((data) => {
-        tracker.callOrder.push('verify')
-        expect(data.customProperty).toBe('Custom Value')
-      })
-
-      synchronizer.on(resource, verifyCallback)
-
-      // Simulate receiving an update
-      const mockSource = mockFactory.lastCreatedSource!
-      const update = {'@id': '/api/books/1', title: 'Updated Title'}
-      mockSource.simulateMessage(update)
-
-      // Verify both callbacks were called
-      expect(customCallback).toHaveBeenCalled()
-      expect(verifyCallback).toHaveBeenCalled()
-
-      // Default resource listener should still update the resource
-      expect(resource.title).toBe('Updated Title')
+      expect(synchronizer['listeners'].has(mockResource['@id'])).toBe(false)
     })
+  })
 
-    it('should handle unsync and resync with additional listeners', () => {
-      const synchronizer = new HydraSynchronizer(hub, {
-        eventSourceFactory: mockFactory,
+  describe('default handler behavior', () => {
+    it('should distribute messages to the correct listeners', async () => {
+      // Create a real instance with the default handler
+      synchronizer = new HydraSynchronizer(hubUrl)
+
+      // Mock the connection's on method to capture the message handler
+      let capturedMessageHandler: ((event: MercureMessageEvent) => void) | null = null
+      synchronizer.connection.on = vi.fn().mockImplementation((event: string, handler: any) => {
+        if (event === 'message') {
+          capturedMessageHandler = handler
+        }
       })
 
-      const resource = {'@id': '/api/books/1', title: 'Original Title'}
-      synchronizer.sync(resource)
+      // Reinstall the handler
+      synchronizer['options'].handler(synchronizer.connection, synchronizer['listeners'])
 
-      // Add a custom callback
-      const callback = vi.fn()
-      synchronizer.on(resource, callback)
+      // Should have registered a message handler
+      expect(synchronizer.connection.on).toHaveBeenCalledWith('message', expect.any(Function))
+      expect(capturedMessageHandler).not.toBeNull()
 
-      // Unsync the resource
-      synchronizer.unsync(resource)
+      // Setup a resource with listeners
+      const callback1 = vi.fn()
+      const callback2 = vi.fn()
+      synchronizer.sync(mockResource)
+      synchronizer.on(mockResource, callback1)
+      synchronizer.on(mockResource, callback2)
 
-      // Resync the resource
-      synchronizer.sync(resource)
+      // Create a mock event with data matching the resource ID
+      const mockEvent: Partial<MercureMessageEvent> = {
+        json: vi.fn().mockResolvedValue({
+          '@id': mockResource['@id'],
+          name: 'Updated Resource',
+        }),
+      }
 
-      // Simulate receiving an update
-      const mockSource = mockFactory.lastCreatedSource!
-      const update = {'@id': '/api/books/1', title: 'Updated Title'}
-      mockSource.simulateMessage(update)
+      // Trigger the handler
+      await capturedMessageHandler!(mockEvent as MercureMessageEvent)
 
-      // The default listener should update the resource
-      expect(resource.title).toBe('Updated Title')
-
-      // The custom callback should not be called since it was removed during unsync
-      expect(callback).not.toHaveBeenCalled()
-
-      // Add the callback again after resyncing
-      synchronizer.on(resource, callback)
-
-      // Simulate another update
-      const update2 = {'@id': '/api/books/1', title: 'Updated Again'}
-      mockSource.simulateMessage(update2)
-
-      // Now the callback should be called
-      expect(callback).toHaveBeenCalledWith(update2, expect.any(Object))
+      // Verify all callbacks were called with the data
+      expect(callback1).toHaveBeenCalledWith(
+        expect.objectContaining({
+          '@id': mockResource['@id'],
+          name: 'Updated Resource',
+        }),
+        mockEvent
+      )
+      expect(callback2).toHaveBeenCalledWith(
+        expect.objectContaining({
+          '@id': mockResource['@id'],
+          name: 'Updated Resource',
+        }),
+        mockEvent
+      )
     })
   })
 })

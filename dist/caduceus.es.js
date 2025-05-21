@@ -1,96 +1,127 @@
-var d = Object.defineProperty;
-var p = (t, s, e) => s in t ? d(t, s, { enumerable: !0, configurable: !0, writable: !0, value: e }) : t[s] = e;
-var c = (t, s, e) => p(t, typeof s != "symbol" ? s + "" : s, e);
-function b(t, s) {
-  return t < s ? -1 : t > s ? 1 : 0;
+var a = Object.defineProperty;
+var h = (e, s, t) => s in e ? a(e, s, { enumerable: !0, configurable: !0, writable: !0, value: t }) : e[s] = t;
+var r = (e, s, t) => h(e, typeof s != "symbol" ? s + "" : s, t);
+function u(e, s) {
+  return e < s ? -1 : e > s ? 1 : 0;
 }
-class S {
+class l {
+  create(s) {
+    return new EventSource(s.toString());
+  }
+}
+class T {
   create(s) {
     return new EventSource(s.toString(), { withCredentials: !0 });
   }
 }
-const h = (t) => (t.includes("*") && (t = ["*"]), [...new Set(t)]), v = {
-  handler: () => {
-  },
-  eventSourceFactory: new S()
-}, f = {
-  append: !0,
-  types: ["message"]
-};
-class T {
-  constructor(s, e = {}) {
-    c(this, "subscribedTopics", []);
-    c(this, "eventSource", null);
-    c(this, "lastEventId", null);
-    c(this, "options");
-    this.hub = s, this.options = { ...v, ...e };
+class E {
+  constructor(s) {
+    this.token = s;
   }
-  subscribe(s, e = {}) {
-    const { append: n, types: i } = { ...f, ...e }, r = Array.isArray(s) ? s : [s];
-    this.eventSource = this.connect(r, !n);
-    const { handler: o } = this.options, a = (u) => {
-      this.lastEventId = u.lastEventId;
-      const l = JSON.parse(u.data);
-      o(l, u);
-    };
-    if (i && i.length > 0)
-      for (const u of i)
-        this.eventSource.addEventListener(u, a);
-  }
-  unsubscribe(s) {
-    const e = Array.isArray(s) ? s : [s], n = this.subscribedTopics.filter((i) => !e.includes(i));
-    this.connect(n, !0);
-  }
-  connect(s, e) {
-    const n = e ? [] : h(this.subscribedTopics), i = h(s), r = h([...n, ...i]);
-    if (this.eventSource && r.length > 0 && b(n, r) === 0)
-      return this.eventSource;
-    if (this.eventSource && (this.eventSource.close(), r.length === 0))
-      return this.eventSource;
-    const o = { topic: r.join(",") };
-    this.lastEventId !== null && (o.lastEventID = this.lastEventId);
-    const a = this.hub + "?" + new URLSearchParams(o);
-    return this.eventSource = this.options.eventSourceFactory.create(a), this.subscribedTopics = r, this.eventSource;
+  create(s) {
+    const t = new URL(s.toString());
+    return t.searchParams.set("authorization", this.token), new EventSource(t.toString());
   }
 }
-const y = {
-  resourceListener: (t) => (s) => Object.assign(t, s),
-  subscribeOptions: {
-    types: ["message"]
-  }
+const o = (e) => (e.includes("*") && (e = ["*"]), [...new Set(e)]), d = {
+  eventSourceFactory: new l(),
+  lastEventId: null
+}, b = {
+  append: !0
 };
-class g {
-  constructor(s, e = {}) {
-    c(this, "connection");
-    c(this, "listeners", /* @__PURE__ */ new Map());
-    c(this, "options");
-    this.options = { ...y, ...e }, this.connection = new T(s, {
-      ...this.options,
-      handler: (n, i) => {
-        const r = this.listeners.get(n["@id"]);
-        for (const o of r ?? [])
-          o(n, i);
-      }
+class p {
+  constructor(s, t = {}) {
+    r(this, "subscribedTopics", []);
+    r(this, "currentlySubscribedTopics", []);
+    r(this, "eventSource", null);
+    r(this, "lastEventId", null);
+    r(this, "options");
+    r(this, "listeners", /* @__PURE__ */ new Map());
+    this.hub = s, this.options = { ...d, ...t }, this.lastEventId = this.options.lastEventId;
+  }
+  subscribe(s, t = {}) {
+    const { append: i } = { ...b, ...t }, n = Array.isArray(s) ? s : [s];
+    this.subscribedTopics = o(
+      i ? [...this.currentlySubscribedTopics, ...this.subscribedTopics, ...n] : n
+    );
+  }
+  on(s, t) {
+    this.listeners.has(s) || this.listeners.set(s, []), this.listeners.get(s).push(t), this.attachListener(s, t);
+  }
+  unsubscribe(s) {
+    const t = Array.isArray(s) ? s : [s], i = this.subscribedTopics.filter((n) => !t.includes(n));
+    this.subscribedTopics = o(i), this.connect();
+  }
+  connect() {
+    if (this.eventSource && this.subscribedTopics.length > 0 && u(this.subscribedTopics, this.currentlySubscribedTopics) === 0)
+      return this.eventSource;
+    if (this.eventSource && this.eventSource.close(), this.subscribedTopics.length === 0)
+      throw new Error("No topics to subscribe to.");
+    const s = { topic: this.subscribedTopics.join(",") };
+    this.lastEventId !== null && (s.lastEventID = this.lastEventId);
+    const t = this.hub + "?" + new URLSearchParams(s);
+    this.eventSource = this.options.eventSourceFactory.create(t);
+    for (const [i, n] of this.listeners.entries())
+      for (const c of n)
+        this.attachListener(i, c);
+    return this.currentlySubscribedTopics = this.subscribedTopics, this.eventSource;
+  }
+  attachListener(s, t) {
+    this.eventSource && this.eventSource.addEventListener(s, (i) => {
+      this.lastEventId = i.lastEventId;
+      const n = {
+        ...i,
+        type: s,
+        json: () => new Promise((c) => c(JSON.parse(i.data)))
+      };
+      t(n);
     });
   }
-  sync(s, e, n) {
-    const i = e ?? s["@id"];
-    this.listeners.has(s["@id"]) || (this.listeners.set(s["@id"], [this.options.resourceListener(s)]), this.connection.subscribe(i, {
-      ...this.options.subscribeOptions,
-      ...n
-    }));
+}
+const S = {
+  handler: (e, s) => {
+    e.on("message", async (t) => {
+      const i = await t.json(), n = s.get(i["@id"]);
+      for (const c of n ?? [])
+        c(i, t);
+    });
+  },
+  resourceListener: (e) => (s) => Object.assign(e, s),
+  subscribeOptions: {
+    append: !0
   }
-  on(s, e) {
-    const n = this.listeners.get(s["@id"]) ?? [];
-    n.push(e), this.listeners.set(s["@id"], [...new Set(n)]);
+};
+class f {
+  constructor(s, t = {}) {
+    r(this, "connection");
+    r(this, "listeners", /* @__PURE__ */ new Map());
+    r(this, "options");
+    this.options = { ...S, ...t }, this.connection = new p(s, {
+      ...this.options
+    });
+    const { handler: i } = this.options;
+    i(this.connection, this.listeners);
+  }
+  sync(s, t, i) {
+    const n = t ?? s["@id"];
+    this.listeners.has(s["@id"]) || (this.listeners.set(s["@id"], [this.options.resourceListener(s)]), this.connection.subscribe(n, {
+      ...this.options.subscribeOptions,
+      ...i
+    }), this.connection.connect());
+  }
+  on(s, t) {
+    const i = this.listeners.get(s["@id"]) ?? [];
+    i.push(t), this.listeners.set(s["@id"], [...new Set(i)]);
   }
   unsync(s) {
     this.listeners.delete(s["@id"]);
   }
 }
 export {
-  f as DEFAULT_SUBSCRIBE_OPTIONS,
-  S as DefaultEventSourceFactory,
-  g as HydraSynchronizer,
-  T as Mercure
+  T as CookieBasedAuthorization,
+  b as DEFAULT_SUBSCRIBE_OPTIONS,
+  l as DefaultEventSourceFactory,
+  f as HydraSynchronizer,
+  p as Mercure,
+  E as QueryParamAuthorization
 };
