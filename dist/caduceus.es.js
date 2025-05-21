@@ -61,10 +61,10 @@ const y = {
 };
 class g {
   constructor(s, e = {}) {
-    c(this, "mercure");
+    c(this, "connection");
     c(this, "listeners", /* @__PURE__ */ new Map());
     c(this, "options");
-    this.options = { ...y, ...e }, this.mercure = new T(s, {
+    this.options = { ...y, ...e }, this.connection = new T(s, {
       ...this.options,
       handler: (n, i) => {
         const r = this.listeners.get(n["@id"]);
@@ -75,7 +75,7 @@ class g {
   }
   sync(s, e, n) {
     const i = e ?? s["@id"];
-    this.listeners.has(s["@id"]) || (this.listeners.set(s["@id"], [this.options.resourceListener(s)]), this.mercure.subscribe(i, {
+    this.listeners.has(s["@id"]) || (this.listeners.set(s["@id"], [this.options.resourceListener(s)]), this.connection.subscribe(i, {
       ...this.options.subscribeOptions,
       ...n
     }));

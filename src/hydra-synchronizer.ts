@@ -20,13 +20,13 @@ const DEFAULT_OPTIONS: Partial<HydraSynchronizerOptions> = {
 }
 
 export class HydraSynchronizer {
-  public readonly mercure: Mercure
+  public readonly connection: Mercure
   private readonly listeners: Map<Iri, Listener[]> = new Map()
   private readonly options: HydraSynchronizerOptions
 
   constructor(hub: string | URL, options: Partial<HydraSynchronizerOptions> = {}) {
     this.options = {...DEFAULT_OPTIONS, ...options} as HydraSynchronizerOptions
-    this.mercure = new Mercure(hub, {
+    this.connection = new Mercure(hub, {
       ...this.options,
       handler: (data: ApiResource, event: MercureMessageEvent) => {
         const callbacks = this.listeners.get(data['@id'])
@@ -43,7 +43,7 @@ export class HydraSynchronizer {
       return
     }
     this.listeners.set(resource['@id'], [this.options.resourceListener(resource)])
-    this.mercure.subscribe(resolvedTopic, {
+    this.connection.subscribe(resolvedTopic, {
       ...this.options.subscribeOptions,
       ...subscribeOptions,
     })
