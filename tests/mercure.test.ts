@@ -1,65 +1,6 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
-import {EventSourceFactory, EventSourceInterface, Mercure, MercureMessageEvent} from '../src'
-
-// Mock spaceship function
-vi.mock('../src/spaceship.ts', () => ({
-  spaceship: (a: any, b: any): -1 | 0 | 1 => {
-    if (a.length < b.length) return -1
-    if (a.length > b.length) return 1
-
-    // Compare arrays element by element
-    for (let i = 0; i < a.length; i++) {
-      if (a[i] < b[i]) return -1
-      if (a[i] > b[i]) return 1
-    }
-
-    return 0
-  },
-}))
-
-// Mock EventSource implementation
-class MockEventSource implements EventSourceInterface {
-  private eventListeners: Map<string, ((event: MessageEvent) => void)[]> = new Map()
-  public isClosed = false
-  public url: string
-
-  constructor(url: string) {
-    this.url = url
-  }
-
-  addEventListener(type: string, callback: (event: MessageEvent) => void): void {
-    if (!this.eventListeners.has(type)) {
-      this.eventListeners.set(type, [])
-    }
-    this.eventListeners.get(type)!.push(callback)
-  }
-
-  close(): void {
-    this.isClosed = true
-  }
-
-  // Helper method to trigger events for testing
-  dispatchEvent(type: string, data: any, lastEventId: string = '1'): void {
-    const listeners = this.eventListeners.get(type) || []
-    const event = {
-      data: JSON.stringify(data),
-      lastEventId,
-      type,
-    } as MessageEvent
-
-    listeners.forEach((listener) => listener(event))
-  }
-}
-
-// Mock EventSourceFactory
-class MockEventSourceFactory implements EventSourceFactory {
-  public lastCreatedEventSource: MockEventSource | null = null
-
-  create(url: string | URL): EventSourceInterface {
-    this.lastCreatedEventSource = new MockEventSource(url.toString())
-    return this.lastCreatedEventSource
-  }
-}
+import {Mercure, MercureMessageEvent} from '../src'
+import {MockEventSourceFactory} from './mocks/MockEventSourceFactory'
 
 describe('Mercure', () => {
   let mockEventSourceFactory: MockEventSourceFactory
