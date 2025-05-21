@@ -1,4 +1,4 @@
-import { Mercure, MercureMessageEvent, MercureOptions, SubscribeOptions } from './mercure.ts';
+import { Mercure, MercureOptions, SubscribeOptions, MercureMessageEvent } from './mercure.ts';
 type ResourceListener = (resource: ApiResource) => Listener;
 type Listener = (data: ApiResource, event: MercureMessageEvent) => void;
 type Iri = string;
@@ -8,6 +8,7 @@ type ApiResource = Record<string, any> & {
 type HydraSynchronizerOptions = MercureOptions & {
     resourceListener: ResourceListener;
     subscribeOptions?: Partial<SubscribeOptions>;
+    handler: (mercure: Mercure, listeners: Map<Iri, Listener[]>) => void;
 };
 export declare class HydraSynchronizer {
     readonly connection: Mercure;

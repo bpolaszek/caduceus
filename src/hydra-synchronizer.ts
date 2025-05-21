@@ -1,4 +1,4 @@
-import {Mercure, MercureMessageEvent, MercureOptions, SubscribeOptions} from './mercure.ts'
+import {Mercure, MercureOptions, SubscribeOptions, MercureMessageEvent} from './mercure.ts'
 
 type ResourceListener = (resource: ApiResource) => Listener
 type Listener = (data: ApiResource, event: MercureMessageEvent) => void
@@ -10,12 +10,22 @@ type ApiResource = Record<string, any> & {
 type HydraSynchronizerOptions = MercureOptions & {
   resourceListener: ResourceListener
   subscribeOptions?: Partial<SubscribeOptions>
+  handler: (mercure: Mercure, listeners: Map<Iri, Listener[]>) => void
 }
 
 const DEFAULT_OPTIONS: Partial<HydraSynchronizerOptions> = {
+  handler: (mercure: Mercure, listeners: Map<Iri, Listener[]>) => {
+    mercure.on('message', async (event: MercureMessageEvent) => {
+      const data = await event.json()
+      const callbacks = listeners.get(data['@id'])
+      for (const callback of callbacks ?? []) {
+        callback(data, event)
+      }
+    })
+  },
   resourceListener: (resource: ApiResource) => (data: any) => Object.assign(resource, data),
   subscribeOptions: {
-    types: ['message'],
+    append: true,
   },
 }
 
@@ -28,13 +38,9 @@ export class HydraSynchronizer {
     this.options = {...DEFAULT_OPTIONS, ...options} as HydraSynchronizerOptions
     this.connection = new Mercure(hub, {
       ...this.options,
-      handler: (data: ApiResource, event: MercureMessageEvent) => {
-        const callbacks = this.listeners.get(data['@id'])
-        for (const callback of callbacks ?? []) {
-          callback(data, event)
-        }
-      },
     })
+    const {handler: handle} = this.options
+    handle(this.connection, this.listeners)
   }
 
   sync(resource: ApiResource, topic?: string, subscribeOptions?: Partial<SubscribeOptions>) {
@@ -47,6 +53,7 @@ export class HydraSynchronizer {
       ...this.options.subscribeOptions,
       ...subscribeOptions,
     })
+    this.connection.connect()
   }
 
   on(resource: ApiResource, callback: Listener) {
