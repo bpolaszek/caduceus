@@ -28,7 +28,7 @@ export interface EventSourceFactory {
 
 export class DefaultEventSourceFactory implements EventSourceFactory {
   create(url: string | URL): EventSourceInterface {
-    return new EventSource(url.toString(), {withCredentials: true}) as EventSourceInterface
+    return new EventSource(url.toString()) as EventSourceInterface
   }
 }
 
