@@ -4,7 +4,7 @@ import {EventSourceInterface, EventSourceFactory, MercureMessageEvent} from '../
  * Mock implementation of EventSourceInterface for testing
  */
 export class MockEventSource implements EventSourceInterface {
-  onmessage: ((event: MercureMessageEvent) => void) | null = null
+  private listeners: Map<string, Array<(event: MercureMessageEvent) => void>> = new Map()
   url: string
   isClosed: boolean = false
 
@@ -12,21 +12,31 @@ export class MockEventSource implements EventSourceInterface {
     this.url = url
   }
 
+  addEventListener(type: string, callback: (event: MercureMessageEvent) => void): void {
+    if (!this.listeners.has(type)) {
+      this.listeners.set(type, [])
+    }
+    this.listeners.get(type)!.push(callback)
+  }
+
   close(): void {
     this.isClosed = true
+    this.listeners.clear()
   }
 
   /**
    * Helper method to simulate receiving a message
    */
-  simulateMessage(data: any, lastEventId: string = '1'): void {
-    if (this.onmessage) {
+  simulateMessage(data: any, lastEventId: string = '1', type: string = 'message'): void {
+    const listeners = this.listeners.get(type) || []
+
+    if (listeners.length > 0) {
       const messageEvent = {
         data: JSON.stringify(data),
         lastEventId,
       } as MercureMessageEvent
 
-      this.onmessage(messageEvent)
+      listeners.forEach((listener) => listener(messageEvent))
     }
   }
 }
