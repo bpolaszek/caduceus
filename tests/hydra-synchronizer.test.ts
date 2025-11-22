@@ -63,7 +63,7 @@ describe('HydraSynchronizer', () => {
 
       expect(synchronizer['options'].resourceListener).toBe(customResourceListener)
       expect(synchronizer['options'].handler).toBe(customHandler)
-      expect(customHandler).toHaveBeenCalledWith(synchronizer.connection, synchronizer['listeners'])
+      expect(customHandler).toHaveBeenCalledWith(synchronizer.connection, synchronizer['updateListeners'])
     })
 
     it('should call the handler with the connection and listeners', () => {
@@ -72,7 +72,7 @@ describe('HydraSynchronizer', () => {
         handler: handlerMock,
       })
 
-      expect(handlerMock).toHaveBeenCalledWith(synchronizer.connection, synchronizer['listeners'])
+      expect(handlerMock).toHaveBeenCalledWith(synchronizer.connection, synchronizer['updateListeners'])
     })
   })
 
@@ -80,8 +80,8 @@ describe('HydraSynchronizer', () => {
     it('should add a listener for the resource', () => {
       synchronizer.sync(mockResource)
 
-      expect(synchronizer['listeners'].has(mockResource['@id'])).toBe(true)
-      expect(synchronizer['listeners'].get(mockResource['@id'])).toHaveLength(1)
+      expect(synchronizer['updateListeners'].has(mockResource['@id'])).toBe(true)
+      expect(synchronizer['updateListeners'].get(mockResource['@id'])).toHaveLength(1)
     })
 
     it('should use the resource @id as topic if none provided', () => {
@@ -102,7 +102,7 @@ describe('HydraSynchronizer', () => {
       synchronizer.sync(mockResource)
 
       // Should still have just one listener
-      expect(synchronizer['listeners'].get(mockResource['@id'])).toHaveLength(1)
+      expect(synchronizer['updateListeners'].get(mockResource['@id'])).toHaveLength(1)
     })
 
     it('should call connect on the Mercure connection', () => {
@@ -120,42 +120,78 @@ describe('HydraSynchronizer', () => {
       synchronizer.sync(mockResource)
 
       // Then add a callback
-      synchronizer.on(mockResource, callback)
+      synchronizer.onUpdate(mockResource, callback)
 
-      expect(synchronizer['listeners'].get(mockResource['@id'])).toHaveLength(2)
-      expect(synchronizer['listeners'].get(mockResource['@id'])?.[1]).toBe(callback)
+      expect(synchronizer['updateListeners'].get(mockResource['@id'])).toHaveLength(2)
+      expect(synchronizer['updateListeners'].get(mockResource['@id'])?.[1]).toBe(callback)
     })
 
     it('should create listeners array if none exists for the resource', () => {
       const callback = vi.fn()
 
       // No sync first, directly add a callback
-      synchronizer.on(mockResource, callback)
+      synchronizer.onUpdate(mockResource, callback)
 
-      expect(synchronizer['listeners'].get(mockResource['@id'])).toHaveLength(1)
-      expect(synchronizer['listeners'].get(mockResource['@id'])?.[0]).toBe(callback)
+      expect(synchronizer['updateListeners'].get(mockResource['@id'])).toHaveLength(1)
+      expect(synchronizer['updateListeners'].get(mockResource['@id'])?.[0]).toBe(callback)
     })
 
     it('should not add duplicate callbacks', () => {
       const callback = vi.fn()
 
       synchronizer.sync(mockResource)
-      synchronizer.on(mockResource, callback)
-      synchronizer.on(mockResource, callback)
+      synchronizer.onUpdate(mockResource, callback)
+      synchronizer.onUpdate(mockResource, callback)
 
       // Should have the default listener plus our callback
-      expect(synchronizer['listeners'].get(mockResource['@id'])).toHaveLength(2)
+      expect(synchronizer['updateListeners'].get(mockResource['@id'])).toHaveLength(2)
+    })
+  })
+
+  describe('onDelete', () => {
+    it('should add a callback to the delete listeners for the resource', () => {
+      const callback = vi.fn()
+
+      // First sync to initialize the listeners maps
+      synchronizer.sync(mockResource)
+
+      // Then add a delete callback
+      synchronizer.onDelete(mockResource, callback)
+
+      expect(synchronizer['deleteListeners'].get(mockResource['@id'])).toHaveLength(1)
+      expect(synchronizer['deleteListeners'].get(mockResource['@id'])?.[0]).toBe(callback)
+    })
+
+    it('should create delete listeners array if none exists for the resource', () => {
+      const callback = vi.fn()
+
+      // No sync first, directly add a delete callback
+      synchronizer.onDelete(mockResource, callback)
+
+      expect(synchronizer['deleteListeners'].get(mockResource['@id'])).toHaveLength(1)
+      expect(synchronizer['deleteListeners'].get(mockResource['@id'])?.[0]).toBe(callback)
+    })
+
+    it('should not add duplicate delete callbacks', () => {
+      const callback = vi.fn()
+
+      synchronizer.sync(mockResource)
+      synchronizer.onDelete(mockResource, callback)
+      synchronizer.onDelete(mockResource, callback)
+
+      // Should have our callback only once
+      expect(synchronizer['deleteListeners'].get(mockResource['@id'])).toHaveLength(1)
     })
   })
 
   describe('unsync', () => {
     it('should remove all listeners for the resource', () => {
       synchronizer.sync(mockResource)
-      synchronizer.on(mockResource, vi.fn())
+      synchronizer.onUpdate(mockResource, vi.fn())
 
       synchronizer.unsync(mockResource)
 
-      expect(synchronizer['listeners'].has(mockResource['@id'])).toBe(false)
+      expect(synchronizer['updateListeners'].has(mockResource['@id'])).toBe(false)
     })
   })
 
@@ -173,7 +209,7 @@ describe('HydraSynchronizer', () => {
       })
 
       // Reinstall the handler
-      synchronizer['options'].handler(synchronizer.connection, synchronizer['listeners'])
+      synchronizer['options'].handler(synchronizer.connection, synchronizer['updateListeners'])
 
       // Should have registered a message handler
       expect(synchronizer.connection.on).toHaveBeenCalledWith('message', expect.any(Function))
@@ -183,8 +219,8 @@ describe('HydraSynchronizer', () => {
       const callback1 = vi.fn()
       const callback2 = vi.fn()
       synchronizer.sync(mockResource)
-      synchronizer.on(mockResource, callback1)
-      synchronizer.on(mockResource, callback2)
+      synchronizer.onUpdate(mockResource, callback1)
+      synchronizer.onUpdate(mockResource, callback2)
 
       // Create a mock event with data matching the resource ID
       const mockEvent: Partial<MercureMessageEvent> = {
@@ -212,6 +248,44 @@ describe('HydraSynchronizer', () => {
         }),
         mockEvent
       )
+    })
+
+    it('should route deletion payloads to delete listeners (not update listeners)', async () => {
+      // Create a real instance with the default handler
+      synchronizer = new HydraSynchronizer(hubUrl)
+
+      // Capture the message handler installed by the default handler
+      let capturedMessageHandler: ((event: MercureMessageEvent) => void) | null = null
+      synchronizer.connection.on = vi.fn().mockImplementation((event: string, handler: any) => {
+        if (event === 'message') {
+          capturedMessageHandler = handler
+        }
+      })
+
+      // Reinstall the handler to use the mocked on()
+      synchronizer['options'].handler(synchronizer.connection, synchronizer['updateListeners'])
+
+      expect(synchronizer.connection.on).toHaveBeenCalledWith('message', expect.any(Function))
+      expect(capturedMessageHandler).not.toBeNull()
+
+      // Setup a resource with both update and delete listeners
+      const updateCb = vi.fn()
+      const deleteCb = vi.fn()
+      synchronizer.sync(mockResource)
+      synchronizer.onUpdate(mockResource, updateCb)
+      synchronizer.onDelete(mockResource, deleteCb)
+
+      // Deletion payload: only @-prefixed keys
+      const deletionEvent: Partial<MercureMessageEvent> = {
+        json: vi.fn().mockResolvedValue({
+          '@id': mockResource['@id'],
+        }),
+      }
+
+      await capturedMessageHandler!(deletionEvent as MercureMessageEvent)
+
+      expect(deleteCb).toHaveBeenCalledWith(expect.objectContaining({'@id': mockResource['@id']}), deletionEvent)
+      expect(updateCb).not.toHaveBeenCalled()
     })
   })
 })
