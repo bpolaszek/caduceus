@@ -17,7 +17,7 @@ export type SubscribeOptions = {
     append: boolean;
 };
 export interface EventSourceFactory {
-    create(url: string | URL): EventSourceInterface;
+    create(url: string | URL, options?: any): EventSourceInterface;
 }
 export declare class DefaultEventSourceFactory implements EventSourceFactory {
     create(url: string | URL): EventSourceInterface;
@@ -28,7 +28,7 @@ export declare class CookieBasedAuthorization implements EventSourceFactory {
 export declare class QueryParamAuthorization implements EventSourceFactory {
     private readonly token;
     constructor(token: string);
-    create(url: string | URL): EventSourceInterface;
+    create(url: string | URL, options?: any): EventSourceInterface;
 }
 export declare const DEFAULT_SUBSCRIBE_OPTIONS: SubscribeOptions;
 export declare class Mercure {
@@ -43,7 +43,9 @@ export declare class Mercure {
     subscribe(topic: Topic | Topic[], options?: Partial<SubscribeOptions>): void;
     on(type: string, listener: Listener): void;
     unsubscribe(topic: Topic | Topic[]): void;
-    connect(): EventSourceInterface;
+    disconnect(): void;
+    connect(options?: any): EventSourceInterface;
+    reconnect(options?: any): void;
     private attachListener;
 }
 export {};

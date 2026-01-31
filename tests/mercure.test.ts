@@ -159,6 +159,15 @@ describe('Mercure', () => {
     })
   })
 
+  describe('disconnect', () => {
+    it('disconnects the event source', () => {
+      mercure.subscribe('*')
+      mercure.connect()
+      mercure.disconnect()
+      expect(mercure['eventSource']).toBeNull()
+    })
+  })
+
   describe('attachListener', () => {
     it('should attach the listener to the EventSource', () => {
       const listener = vi.fn()

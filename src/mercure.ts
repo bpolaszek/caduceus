@@ -23,7 +23,7 @@ export type SubscribeOptions = {
 }
 
 export interface EventSourceFactory {
-  create(url: string | URL): EventSourceInterface
+  create(url: string | URL, options?: any): EventSourceInterface
 }
 
 export class DefaultEventSourceFactory implements EventSourceFactory {
@@ -41,9 +41,9 @@ export class CookieBasedAuthorization implements EventSourceFactory {
 export class QueryParamAuthorization implements EventSourceFactory {
   constructor(private readonly token: string) {}
 
-  create(url: string | URL): EventSourceInterface {
+  create(url: string | URL, options: any = {}): EventSourceInterface {
     const parsedUrl = new URL(url.toString())
-    parsedUrl.searchParams.set('authorization', this.token)
+    parsedUrl.searchParams.set('authorization', options.token ?? this.token)
     return new EventSource(parsedUrl.toString()) as EventSourceInterface
   }
 }
@@ -103,7 +103,14 @@ export class Mercure {
     this.connect()
   }
 
-  public connect(): EventSourceInterface {
+  public disconnect(): void {
+    if (this.eventSource) {
+      this.eventSource.close()
+      this.eventSource = null
+    }
+  }
+
+  public connect(options: any = {}): EventSourceInterface {
     if (
       this.eventSource &&
       this.subscribedTopics.length > 0 &&
@@ -126,7 +133,7 @@ export class Mercure {
     }
 
     const url = this.hub + '?' + new URLSearchParams(params)
-    this.eventSource = this.options.eventSourceFactory!.create(url)
+    this.eventSource = this.options.eventSourceFactory!.create(url, options)
     for (const [type, listeners] of this.listeners.entries()) {
       for (const listener of listeners) {
         this.attachListener(type, listener)
@@ -135,6 +142,11 @@ export class Mercure {
     this.currentlySubscribedTopics = this.subscribedTopics
 
     return this.eventSource
+  }
+
+  public reconnect(options: any = {}) {
+    this.disconnect()
+    this.connect(options)
   }
 
   private attachListener(type: string, listener: Listener) {
