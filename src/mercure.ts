@@ -1,6 +1,7 @@
 import {spaceship} from './spaceship.ts'
 
-type Topic = string
+export type UrlPatternTopic = {match: string; matchType: 'urlpattern'}
+export type Topic = string | UrlPatternTopic
 type RawMessageEvent = MessageEvent
 export type MercureMessageEvent = RawMessageEvent & {
   type: string
@@ -13,10 +14,19 @@ export interface EventSourceInterface {
   close(): void
 }
 
+export const MercureProtocol = {LEGACY: 'legacy', V1: '1.0'} as const
+export type MercureProtocolVersion = (typeof MercureProtocol)[keyof typeof MercureProtocol]
+
 export type MercureOptions = {
   eventSourceFactory: EventSourceFactory
   lastEventId: string | null
+  protocol: MercureProtocolVersion
 }
+
+// Declares a WHATWG URL Pattern topic (e.g. `/books/:id`). Requires the Mercure 1.0 protocol.
+export const urlPattern = (match: string): UrlPatternTopic => ({match, matchType: 'urlpattern'})
+
+const topicKey = (topic: Topic): string => (typeof topic === 'string' ? topic : `urlpattern:${topic.match}`)
 
 export type SubscribeOptions = {
   append: boolean
@@ -38,6 +48,10 @@ export class CookieBasedAuthorization implements EventSourceFactory {
   }
 }
 
+/**
+ * @deprecated The `authorization` query parameter was removed in Mercure 1.0: this only works with
+ * `MercureProtocol.LEGACY`. Use `CookieBasedAuthorization` instead.
+ */
 export class QueryParamAuthorization implements EventSourceFactory {
   constructor(private readonly token: string) {}
 
@@ -50,14 +64,19 @@ export class QueryParamAuthorization implements EventSourceFactory {
 
 const resolveSubscribedTopics = (topics: Topic[]): Topic[] => {
   if (topics.includes('*')) {
-    topics = ['*']
+    return ['*']
   }
-  return [...new Set(topics)]
+  const uniqueTopics = new Map<string, Topic>()
+  for (const topic of topics) {
+    uniqueTopics.set(topicKey(topic), topic)
+  }
+  return [...uniqueTopics.values()]
 }
 
 const DEFAULT_MERCURE_OPTIONS: MercureOptions = {
   eventSourceFactory: new DefaultEventSourceFactory(),
   lastEventId: null,
+  protocol: MercureProtocol.V1,
 }
 
 export const DEFAULT_SUBSCRIBE_OPTIONS: SubscribeOptions = {
@@ -98,7 +117,8 @@ export class Mercure {
 
   public unsubscribe(topic: Topic | Topic[]): void {
     const topics = Array.isArray(topic) ? topic : [topic]
-    const newTopicList = this.subscribedTopics.filter((t) => !topics.includes(t))
+    const removedKeys = topics.map(topicKey)
+    const newTopicList = this.subscribedTopics.filter((t) => !removedKeys.includes(topicKey(t)))
     this.subscribedTopics = resolveSubscribedTopics(newTopicList)
     this.connect()
   }
@@ -114,7 +134,7 @@ export class Mercure {
     if (
       this.eventSource &&
       this.subscribedTopics.length > 0 &&
-      0 === spaceship(this.subscribedTopics, this.currentlySubscribedTopics)
+      0 === spaceship(this.subscribedTopics.map(topicKey), this.currentlySubscribedTopics.map(topicKey))
     ) {
       return this.eventSource
     }
@@ -127,12 +147,7 @@ export class Mercure {
       throw new Error('No topics to subscribe to.')
     }
 
-    const params: Record<string, string> = {topic: this.subscribedTopics.join(',')}
-    if (this.lastEventId !== null) {
-      params.lastEventID = this.lastEventId
-    }
-
-    const url = this.hub + '?' + new URLSearchParams(params)
+    const url = this.hub + '?' + this.buildQueryParams()
     this.eventSource = this.options.eventSourceFactory!.create(url, options)
     for (const [type, listeners] of this.listeners.entries()) {
       for (const listener of listeners) {
@@ -147,6 +162,33 @@ export class Mercure {
   public reconnect(options: any = {}) {
     this.disconnect()
     this.connect(options)
+  }
+
+  private buildQueryParams(): URLSearchParams {
+    const params = new URLSearchParams()
+
+    if (this.options.protocol === MercureProtocol.LEGACY) {
+      if (this.subscribedTopics.some((topic) => typeof topic !== 'string')) {
+        throw new Error('URL pattern topics require the Mercure 1.0 protocol.')
+      }
+      params.set('topic', this.subscribedTopics.join(','))
+      if (this.lastEventId !== null) {
+        params.set('lastEventID', this.lastEventId)
+      }
+      return params
+    }
+
+    for (const topic of this.subscribedTopics) {
+      if (typeof topic === 'string') {
+        params.append('match', topic)
+      } else {
+        params.append('match_urlpattern', topic.match)
+      }
+    }
+    if (this.lastEventId !== null) {
+      params.set('last_event_id', this.lastEventId)
+    }
+    return params
   }
 
   private attachListener(type: string, listener: Listener) {

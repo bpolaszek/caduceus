@@ -1,5 +1,5 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
-import {Mercure, MercureMessageEvent} from '../src'
+import {Mercure, MercureMessageEvent, MercureProtocol, urlPattern} from '../src'
 import {MockEventSourceFactory} from './mocks/MockEventSourceFactory'
 
 describe('Mercure', () => {
@@ -66,6 +66,11 @@ describe('Mercure', () => {
       expect(mercure['subscribedTopics']).toEqual(['*'])
     })
 
+    it('should deduplicate URL pattern topics', () => {
+      mercure.subscribe([urlPattern('/a/:id'), urlPattern('/a/:id'), '/a/:id'])
+      expect(mercure['subscribedTopics']).toEqual([urlPattern('/a/:id'), '/a/:id'])
+    })
+
     it('should deduplicate topics', () => {
       mercure.subscribe(['topic1', 'topic1', 'topic2'])
       expect(mercure['subscribedTopics']).toEqual(['topic1', 'topic2'])
@@ -105,6 +110,12 @@ describe('Mercure', () => {
       expect(mercure['subscribedTopics']).toEqual(['topic2'])
     })
 
+    it('should remove a URL pattern topic', () => {
+      mercure.subscribe(urlPattern('/a/:id'))
+      mercure.unsubscribe(urlPattern('/a/:id'))
+      expect(mercure['subscribedTopics']).toEqual(['topic1', 'topic2', 'topic3'])
+    })
+
     it('should call connect after unsubscribing', () => {
       const connectSpy = vi.spyOn(mercure, 'connect')
       mercure.unsubscribe('topic1')
@@ -117,17 +128,70 @@ describe('Mercure', () => {
       mercure.subscribe('topic1')
     })
 
-    it('should create a new EventSource with the correct URL', () => {
-      mercure.connect()
-      expect(mockEventSourceFactory.lastCreatedEventSource).not.toBeNull()
-      expect(mockEventSourceFactory.lastCreatedEventSource!.url).toContain(hubUrl)
-      expect(mockEventSourceFactory.lastCreatedEventSource!.url).toContain('topic=topic1')
+    it('should default to the 1.0 protocol', () => {
+      expect(mercure['options'].protocol).toBe(MercureProtocol.V1)
     })
 
-    it('should include the lastEventId in the URL if provided', () => {
+    it('should create a new EventSource with the correct 1.0 URL', () => {
+      mercure.connect()
+      const url = mockEventSourceFactory.lastCreatedEventSource!.url
+      expect(url).toContain(hubUrl)
+      expect(url).toContain('match=topic1')
+      expect(url).not.toContain('topic=')
+    })
+
+    it('should send one match parameter per topic in 1.0', () => {
+      mercure.subscribe('topic2')
+      mercure.connect()
+      expect(mockEventSourceFactory.lastCreatedEventSource!.url).toBe(`${hubUrl}?match=topic1&match=topic2`)
+    })
+
+    it('should send match=* for the wildcard topic in 1.0', () => {
+      mercure.subscribe('*')
+      mercure.connect()
+      expect(mockEventSourceFactory.lastCreatedEventSource!.url).toBe(`${hubUrl}?match=*`)
+    })
+
+    it('should send URL patterns as match_urlpattern in 1.0', () => {
+      mercure.subscribe(urlPattern('/books/:id'))
+      mercure.connect()
+      expect(mockEventSourceFactory.lastCreatedEventSource!.url).toBe(
+        `${hubUrl}?match=topic1&match_urlpattern=%2Fbooks%2F%3Aid`
+      )
+    })
+
+    it('should include last_event_id in the 1.0 URL if provided', () => {
       mercure['lastEventId'] = 'event-123'
       mercure.connect()
-      expect(mockEventSourceFactory.lastCreatedEventSource!.url).toContain('lastEventID=event-123')
+      const url = mockEventSourceFactory.lastCreatedEventSource!.url
+      expect(url).toContain('last_event_id=event-123')
+      expect(url).not.toContain('lastEventID')
+    })
+
+    describe('with the legacy protocol', () => {
+      beforeEach(() => {
+        mercure = new Mercure(hubUrl, {eventSourceFactory: mockEventSourceFactory, protocol: MercureProtocol.LEGACY})
+        mercure.subscribe('topic1')
+      })
+
+      it('should create a new EventSource with the correct legacy URL', () => {
+        mercure.connect()
+        const url = mockEventSourceFactory.lastCreatedEventSource!.url
+        expect(url).toContain(hubUrl)
+        expect(url).toContain('topic=topic1')
+        expect(url).not.toContain('match')
+      })
+
+      it('should include lastEventID in the URL if provided', () => {
+        mercure['lastEventId'] = 'event-123'
+        mercure.connect()
+        expect(mockEventSourceFactory.lastCreatedEventSource!.url).toContain('lastEventID=event-123')
+      })
+
+      it('should refuse URL pattern topics', () => {
+        mercure.subscribe(urlPattern('/books/:id'))
+        expect(() => mercure.connect()).toThrow('URL pattern topics require the Mercure 1.0 protocol.')
+      })
     })
 
     it('should close the existing EventSource before creating a new one', () => {

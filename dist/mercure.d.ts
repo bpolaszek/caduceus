@@ -1,4 +1,8 @@
-type Topic = string;
+export type UrlPatternTopic = {
+    match: string;
+    matchType: 'urlpattern';
+};
+export type Topic = string | UrlPatternTopic;
 type RawMessageEvent = MessageEvent;
 export type MercureMessageEvent = RawMessageEvent & {
     type: string;
@@ -9,10 +13,17 @@ export interface EventSourceInterface {
     addEventListener(type: string, callback: (event: RawMessageEvent) => void): void;
     close(): void;
 }
+export declare const MercureProtocol: {
+    readonly LEGACY: "legacy";
+    readonly V1: "1.0";
+};
+export type MercureProtocolVersion = (typeof MercureProtocol)[keyof typeof MercureProtocol];
 export type MercureOptions = {
     eventSourceFactory: EventSourceFactory;
     lastEventId: string | null;
+    protocol: MercureProtocolVersion;
 };
+export declare const urlPattern: (match: string) => UrlPatternTopic;
 export type SubscribeOptions = {
     append: boolean;
 };
@@ -25,6 +36,10 @@ export declare class DefaultEventSourceFactory implements EventSourceFactory {
 export declare class CookieBasedAuthorization implements EventSourceFactory {
     create(url: string | URL): EventSourceInterface;
 }
+/**
+ * @deprecated The `authorization` query parameter was removed in Mercure 1.0: this only works with
+ * `MercureProtocol.LEGACY`. Use `CookieBasedAuthorization` instead.
+ */
 export declare class QueryParamAuthorization implements EventSourceFactory {
     private readonly token;
     constructor(token: string);
@@ -46,6 +61,7 @@ export declare class Mercure {
     disconnect(): void;
     connect(options?: any): EventSourceInterface;
     reconnect(options?: any): void;
+    private buildQueryParams;
     private attachListener;
 }
 export {};
