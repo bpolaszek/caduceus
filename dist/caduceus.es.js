@@ -1,16 +1,16 @@
 var l = Object.defineProperty;
 var p = (i, t, e) => t in i ? l(i, t, { enumerable: !0, configurable: !0, writable: !0, value: e }) : i[t] = e;
-var n = (i, t, e) => p(i, typeof t != "symbol" ? t + "" : t, e);
+var r = (i, t, e) => p(i, typeof t != "symbol" ? t + "" : t, e);
 function d(i, t) {
   return i < t ? -1 : i > t ? 1 : 0;
 }
-const u = { LEGACY: "legacy", V1: "1.0" }, E = (i) => ({ match: i, matchType: "urlpattern" }), c = (i) => typeof i == "string" ? i : `urlpattern:${i.match}`;
+const a = { LEGACY: "legacy", V1: "1.0" }, L = (i) => ({ match: i, matchType: "urlpattern" }), c = (i) => typeof i == "string" ? i : `urlpattern:${i.match}`;
 class b {
   create(t) {
     return new EventSource(t.toString());
   }
 }
-class L {
+class T {
   create(t) {
     return new EventSource(t.toString(), { withCredentials: !0 });
   }
@@ -24,7 +24,7 @@ class y {
     return s.searchParams.set("authorization", e.token ?? this.token), new EventSource(s.toString());
   }
 }
-const a = (i) => {
+const u = (i) => {
   if (i.includes("*"))
     return ["*"];
   const t = /* @__PURE__ */ new Map();
@@ -34,32 +34,34 @@ const a = (i) => {
 }, S = {
   eventSourceFactory: new b(),
   lastEventId: null,
-  protocol: u.V1
+  protocol: a.V1
 }, f = {
   append: !0
 };
 class v {
   constructor(t, e = {}) {
-    n(this, "subscribedTopics", []);
-    n(this, "currentlySubscribedTopics", []);
-    n(this, "eventSource", null);
-    n(this, "lastEventId", null);
-    n(this, "options");
-    n(this, "listeners", /* @__PURE__ */ new Map());
+    r(this, "subscribedTopics", []);
+    r(this, "currentlySubscribedTopics", []);
+    r(this, "eventSource", null);
+    r(this, "lastEventId", null);
+    r(this, "options");
+    r(this, "listeners", /* @__PURE__ */ new Map());
     this.hub = t, this.options = { ...S, ...e }, this.lastEventId = this.options.lastEventId;
   }
   subscribe(t, e = {}) {
-    const { append: s } = { ...f, ...e }, r = Array.isArray(t) ? t : [t];
-    this.subscribedTopics = a(
-      s ? [...this.currentlySubscribedTopics, ...this.subscribedTopics, ...r] : r
+    const { append: s } = { ...f, ...e }, n = Array.isArray(t) ? t : [t];
+    if (this.options.protocol === a.LEGACY && n.some((o) => typeof o != "string"))
+      throw new Error("URL pattern topics require the Mercure 1.0 protocol.");
+    this.subscribedTopics = u(
+      s ? [...this.currentlySubscribedTopics, ...this.subscribedTopics, ...n] : n
     );
   }
   on(t, e) {
     this.listeners.has(t) || this.listeners.set(t, []), this.listeners.get(t).push(e), this.attachListener(t, e);
   }
   unsubscribe(t) {
-    const s = (Array.isArray(t) ? t : [t]).map(c), r = this.subscribedTopics.filter((o) => !s.includes(c(o)));
-    this.subscribedTopics = a(r), this.connect();
+    const s = (Array.isArray(t) ? t : [t]).map(c), n = this.subscribedTopics.filter((o) => !s.includes(c(o)));
+    this.subscribedTopics = u(n), this.connect();
   }
   disconnect() {
     this.eventSource && (this.eventSource.close(), this.eventSource = null);
@@ -71,8 +73,8 @@ class v {
       throw new Error("No topics to subscribe to.");
     const e = this.hub + "?" + this.buildQueryParams();
     this.eventSource = this.options.eventSourceFactory.create(e, t);
-    for (const [s, r] of this.listeners.entries())
-      for (const o of r)
+    for (const [s, n] of this.listeners.entries())
+      for (const o of n)
         this.attachListener(s, o);
     return this.currentlySubscribedTopics = this.subscribedTopics, this.eventSource;
   }
@@ -81,11 +83,8 @@ class v {
   }
   buildQueryParams() {
     const t = new URLSearchParams();
-    if (this.options.protocol === u.LEGACY) {
-      if (this.subscribedTopics.some((e) => typeof e != "string"))
-        throw new Error("URL pattern topics require the Mercure 1.0 protocol.");
+    if (this.options.protocol === a.LEGACY)
       return t.set("topic", this.subscribedTopics.join(",")), this.lastEventId !== null && t.set("lastEventID", this.lastEventId), t;
-    }
     for (const e of this.subscribedTopics)
       typeof e == "string" ? t.append("match", e) : t.append("match_urlpattern", e.match);
     return this.lastEventId !== null && t.set("last_event_id", this.lastEventId), t;
@@ -93,18 +92,18 @@ class v {
   attachListener(t, e) {
     this.eventSource && this.eventSource.addEventListener(t, (s) => {
       this.lastEventId = s.lastEventId;
-      const r = {
+      const n = {
         ...s,
         type: t,
         json: () => new Promise((o) => o(JSON.parse(s.data)))
       };
-      e(r);
+      e(n);
     });
   }
 }
 class w {
   constructor(t, e = {}) {
-    n(this, "DEFAULT_OPTIONS", {
+    r(this, "DEFAULT_OPTIONS", {
       handler: (t) => {
         t.on("message", async (e) => {
           const s = await e.json();
@@ -120,10 +119,10 @@ class w {
         append: !0
       }
     });
-    n(this, "connection");
-    n(this, "updateListeners", /* @__PURE__ */ new Map());
-    n(this, "deleteListeners", /* @__PURE__ */ new Map());
-    n(this, "options");
+    r(this, "connection");
+    r(this, "updateListeners", /* @__PURE__ */ new Map());
+    r(this, "deleteListeners", /* @__PURE__ */ new Map());
+    r(this, "options");
     this.options = { ...this.DEFAULT_OPTIONS, ...e }, this.connection = new v(t, {
       ...this.options
     });
@@ -131,11 +130,11 @@ class w {
     s(this.connection, this.updateListeners);
   }
   sync(t, e, s) {
-    const r = e ?? t["@id"];
-    this.updateListeners.has(t["@id"]) || (this.updateListeners.set(t["@id"], [this.options.resourceListener(t, this.isDeletion(t))]), this.connection.subscribe(r, {
+    const n = e ?? t["@id"];
+    this.updateListeners.has(t["@id"]) || (this.connection.subscribe(n, {
       ...this.options.subscribeOptions,
       ...s
-    }), this.connection.connect());
+    }), this.updateListeners.set(t["@id"], [this.options.resourceListener(t, this.isDeletion(t))]), this.connection.connect());
   }
   unsync(t) {
     this.updateListeners.delete(t["@id"]);
@@ -153,12 +152,12 @@ class w {
   }
 }
 export {
-  L as CookieBasedAuthorization,
+  T as CookieBasedAuthorization,
   f as DEFAULT_SUBSCRIBE_OPTIONS,
   b as DefaultEventSourceFactory,
   w as HydraSynchronizer,
   v as Mercure,
-  u as MercureProtocol,
+  a as MercureProtocol,
   y as QueryParamAuthorization,
-  E as urlPattern
+  L as urlPattern
 };

@@ -102,6 +102,9 @@ export class Mercure {
   public subscribe(topic: Topic | Topic[], options: Partial<SubscribeOptions> = {}): void {
     const {append} = {...DEFAULT_SUBSCRIBE_OPTIONS, ...options}
     const topics = Array.isArray(topic) ? topic : [topic]
+    if (this.options.protocol === MercureProtocol.LEGACY && topics.some((t) => typeof t !== 'string')) {
+      throw new Error('URL pattern topics require the Mercure 1.0 protocol.')
+    }
     this.subscribedTopics = resolveSubscribedTopics(
       append ? [...this.currentlySubscribedTopics, ...this.subscribedTopics, ...topics] : topics
     )
@@ -168,9 +171,6 @@ export class Mercure {
     const params = new URLSearchParams()
 
     if (this.options.protocol === MercureProtocol.LEGACY) {
-      if (this.subscribedTopics.some((topic) => typeof topic !== 'string')) {
-        throw new Error('URL pattern topics require the Mercure 1.0 protocol.')
-      }
       params.set('topic', this.subscribedTopics.join(','))
       if (this.lastEventId !== null) {
         params.set('lastEventID', this.lastEventId)

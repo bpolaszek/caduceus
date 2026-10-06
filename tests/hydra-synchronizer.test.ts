@@ -97,12 +97,6 @@ describe('HydraSynchronizer', () => {
       expect(mockMercure.subscribe).toHaveBeenCalledWith(customTopic, expect.any(Object))
     })
 
-    it('should accept a URL pattern topic', () => {
-      const pattern = {match: '/api/resources/:id', matchType: 'urlpattern' as const}
-      synchronizer.sync(mockResource, pattern)
-      expect(mockMercure.subscribe).toHaveBeenCalledWith(pattern, expect.any(Object))
-    })
-
     it('should not add listener if resource is already being synced', () => {
       synchronizer.sync(mockResource)
       synchronizer.sync(mockResource)

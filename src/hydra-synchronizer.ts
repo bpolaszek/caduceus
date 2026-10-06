@@ -54,11 +54,11 @@ export class HydraSynchronizer {
     if (this.updateListeners.has(resource['@id'])) {
       return
     }
-    this.updateListeners.set(resource['@id'], [this.options.resourceListener(resource, this.isDeletion(resource))])
     this.connection.subscribe(resolvedTopic, {
       ...this.options.subscribeOptions,
       ...subscribeOptions,
     })
+    this.updateListeners.set(resource['@id'], [this.options.resourceListener(resource, this.isDeletion(resource))])
     this.connection.connect()
   }
 

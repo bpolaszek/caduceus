@@ -160,6 +160,15 @@ describe('Mercure', () => {
       )
     })
 
+    it('should not reconnect when the same URL pattern is subscribed again', () => {
+      mercure.subscribe(urlPattern('/books/:id'))
+      mercure.connect()
+      const eventSource = mockEventSourceFactory.lastCreatedEventSource
+      mercure.subscribe(urlPattern('/books/:id'))
+      expect(mercure.connect()).toBe(eventSource)
+      expect(eventSource!.isClosed).toBe(false)
+    })
+
     it('should include last_event_id in the 1.0 URL if provided', () => {
       mercure['lastEventId'] = 'event-123'
       mercure.connect()
@@ -189,8 +198,17 @@ describe('Mercure', () => {
       })
 
       it('should refuse URL pattern topics', () => {
-        mercure.subscribe(urlPattern('/books/:id'))
-        expect(() => mercure.connect()).toThrow('URL pattern topics require the Mercure 1.0 protocol.')
+        expect(() => mercure.subscribe(urlPattern('/books/:id'))).toThrow(
+          'URL pattern topics require the Mercure 1.0 protocol.'
+        )
+      })
+
+      it('should keep the current connection alive when a URL pattern topic is refused', () => {
+        mercure.connect()
+        const eventSource = mockEventSourceFactory.lastCreatedEventSource
+        expect(() => mercure.subscribe(urlPattern('/books/:id'))).toThrow()
+        expect(mercure.connect()).toBe(eventSource)
+        expect(eventSource!.isClosed).toBe(false)
       })
     })
 
