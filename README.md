@@ -52,7 +52,7 @@ If your back-end is built using [Hydra](https://www.hydra-cg.com/) (for example 
 you can use the `HydraSynchronizer` class to simplify resource synchronization:
 
 ```typescript
-import { HydraSynchronizer } from 'bentools-caduceus';
+import { HydraSynchronizer, urlPattern } from 'bentools-caduceus';
 
 // Create a synchronizer connected to your Mercure hub
 const synchronizer = new HydraSynchronizer('https://example.com/.well-known/mercure');
@@ -74,7 +74,7 @@ synchronizer.sync(resource);
 > [!IMPORTANT]  
 > By default, Caduceus uses the `@id` property of the resource to determine the topic for Mercure subscriptions.
 > Synchronizing too many resources at once may lead to performance issues.
-> Consider using URI templates or a wildcard topic to reduce the number of subscriptions.
+> Consider using URL patterns (URI templates with `MercureProtocol.LEGACY`) or a wildcard topic to reduce the number of subscriptions.
 
 ```typescript
 synchronizer.sync(resource, urlPattern('/api/books/:id')); // Mercure 1.0 (URI Template '/api/books/{id}' with LEGACY)
@@ -101,7 +101,7 @@ const mercure = new Mercure('https://example.com/.well-known/mercure', {
 | Last event ID | `?lastEventID=…` | `?last_event_id=…` |
 | Query param authorization | `?authorization=…` | not supported (removed from the protocol) |
 
-In 1.0, a plain string topic is an **exact match**. To subscribe to a [URL pattern](https://urlpattern.spec.whatwg.org/)
+In 1.0, a plain string topic is an **exact match** (`'*'` subscribes to every topic). To subscribe to a [URL pattern](https://urlpattern.spec.whatwg.org/)
 (which replaces URI Templates), wrap it with `urlPattern()`:
 
 ```typescript
@@ -219,6 +219,12 @@ constructor(hub: string | URL, options?: Partial<MercureOptions>)
 - `unsubscribe(topic: Topic | Topic[]): void` - Unsubscribe from one or more topics
 - `on(type: string, listener: Listener): void` - Add an event listener
 - `connect(): EventSourceInterface` - Connect to the Mercure hub
+
+#### Helpers and types
+
+- `urlPattern(match: string): UrlPatternTopic` - Declare a URL pattern topic (Mercure 1.0 only)
+- `Topic` - `string | UrlPatternTopic`: a plain string is an exact match
+- `MercureProtocol` - `MercureProtocol.V1` (`'1.0'`, default) or `MercureProtocol.LEGACY` (`'legacy'`)
 
 ### Authorization Factories
 
