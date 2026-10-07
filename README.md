@@ -52,7 +52,7 @@ If your back-end is built using [Hydra](https://www.hydra-cg.com/) (for example 
 you can use the `HydraSynchronizer` class to simplify resource synchronization:
 
 ```typescript
-import { HydraSynchronizer } from 'bentools-caduceus';
+import { HydraSynchronizer, urlPattern } from 'bentools-caduceus';
 
 // Create a synchronizer connected to your Mercure hub
 const synchronizer = new HydraSynchronizer('https://example.com/.well-known/mercure');
@@ -74,13 +74,46 @@ synchronizer.sync(resource);
 > [!IMPORTANT]  
 > By default, Caduceus uses the `@id` property of the resource to determine the topic for Mercure subscriptions.
 > Synchronizing too many resources at once may lead to performance issues.
-> Consider using URI templates or a wildcard topic to reduce the number of subscriptions.
+> Consider using URL patterns (URI templates with `MercureProtocol.LEGACY`) or a wildcard topic to reduce the number of subscriptions.
 
 ```typescript
-synchronizer.sync(resource, '/api/books/{id}');
+synchronizer.sync(resource, urlPattern('/api/books/:id')); // Mercure 1.0 (URI Template '/api/books/{id}' with LEGACY)
 // or
 synchronizer.sync(resource, '*');
 ```
+
+### Protocol version
+
+Caduceus supports both the legacy (0.x) and the [1.0](https://mercure.rocks/spec) versions of the Mercure protocol.
+**Mercure 1.0 is the default.** If your hub still runs the legacy protocol, opt in explicitly:
+
+```typescript
+import { Mercure, MercureProtocol } from 'bentools-caduceus';
+
+const mercure = new Mercure('https://example.com/.well-known/mercure', {
+  protocol: MercureProtocol.LEGACY,
+});
+```
+
+| | `MercureProtocol.LEGACY` | `MercureProtocol.V1` (default) |
+|---|---|---|
+| Topics | `?topic=…` | `?match=…` (exact) / `?match_urlpattern=…` (URL pattern) |
+| Last event ID | `?lastEventID=…` | `?last_event_id=…` |
+| Query param authorization | `?authorization=…` | not supported (removed from the protocol) |
+
+In 1.0, a plain string topic is an **exact match** (`'*'` subscribes to every topic). To subscribe to a [URL pattern](https://urlpattern.spec.whatwg.org/)
+(which replaces URI Templates), wrap it with `urlPattern()`:
+
+```typescript
+import { Mercure, urlPattern } from 'bentools-caduceus';
+
+const mercure = new Mercure('https://example.com/.well-known/mercure');
+mercure.subscribe(['/api/books/1', urlPattern('/api/authors/:id')]);
+```
+
+> [!NOTE]
+> `urlPattern()` topics are rejected (`connect()` throws) with `MercureProtocol.LEGACY`:
+> keep using URI Template strings (`'/api/books/{id}'`) with legacy hubs.
 
 ### Advanced Usage
 
@@ -178,6 +211,7 @@ constructor(hub: string | URL, options?: Partial<MercureOptions>)
 - `options`: Configuration options
     - `eventSourceFactory`: Factory for creating EventSource instances
     - `lastEventId`: ID of the last event received (for resuming)
+    - `protocol`: `MercureProtocol.V1` (default) or `MercureProtocol.LEGACY`
 
 #### Methods
 
@@ -186,11 +220,17 @@ constructor(hub: string | URL, options?: Partial<MercureOptions>)
 - `on(type: string, listener: Listener): void` - Add an event listener
 - `connect(): EventSourceInterface` - Connect to the Mercure hub
 
+#### Helpers and types
+
+- `urlPattern(match: string): UrlPatternTopic` - Declare a URL pattern topic (Mercure 1.0 only)
+- `Topic` - `string | UrlPatternTopic`: a plain string is an exact match
+- `MercureProtocol` - `MercureProtocol.V1` (`'1.0'`, default) or `MercureProtocol.LEGACY` (`'legacy'`)
+
 ### Authorization Factories
 
 #### CookieBasedAuthorization
 
-An `EventSourceFactory` implementation that uses the `mercureAuthorization` cookie for authorization when connecting to a Mercure hub.
+An `EventSourceFactory` implementation that sends cookies (`withCredentials`) when connecting to a Mercure hub: the `__Secure-mercure_access_token` cookie in Mercure 1.0 (`mercureAuthorization` in legacy).
 
 ```typescript
 import { CookieBasedAuthorization, Mercure } from 'bentools-caduceus'
@@ -201,6 +241,9 @@ const mercure = new Mercure('https://example.com/.well-known/mercure', {
 ```
 
 #### QueryParamAuthorization
+
+> [!WARNING]
+> Deprecated: the `authorization` query parameter was removed in Mercure 1.0. It only works with `MercureProtocol.LEGACY`.
 
 An `EventSourceFactory` implementation that adds an authorization token as a query parameter when connecting to a Mercure hub.
 
@@ -232,7 +275,7 @@ constructor(hub: string | URL, options?: Partial<HydraSynchronizerOptions>)
 
 #### Methods
 
-- `sync(resource: ApiResource, topic?: string, subscribeOptions?: Partial<SubscribeOptions>)` - Start synchronizing a resource (topic defaults to the resource `@id`)
+- `sync(resource: ApiResource, topic?: Topic, subscribeOptions?: Partial<SubscribeOptions>)` - Start synchronizing a resource (topic defaults to the resource `@id`)
 - `onUpdate(resource: ApiResource, callback: Listener)` - Add an update listener for a specific resource
 - `onDelete(resource: ApiResource, callback: Listener)` - Add a delete listener for a specific resource
 - `unsync(resource: ApiResource)` - Stop synchronizing a resource
